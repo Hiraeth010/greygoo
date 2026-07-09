@@ -2,6 +2,8 @@
 
 A fully on-chain, closed-system **evolutionary artificial-life simulation** for Solana. Nanotech-themed, but there is no real-world data and no oracles — the chain *is* the world. Autonomous agents ("nanobots") live on a toroidal grid, consume a scarce regenerating resource, replicate with mutated genomes, compete, and evolve. The world is advanced by a permissionless `tick`.
 
+**▶ Live — watch the real engine evolve in your browser: https://greygoo-hiraeth010s-projects.vercel.app**
+
 The design rests on two lines of established prior art: **Avida / Tierra** show that self-replicating programs competing for a scarce resource in a closed, deterministic system produce real selection, speciation, and adaptive radiation; **Dark Forest / MUD / MagicBlock** show that fully-on-chain game state is viable. Grey Goo joins the two — the biology of the former, on the shared deterministic state of the latter.
 
 ## Status

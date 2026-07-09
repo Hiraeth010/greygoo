@@ -107,6 +107,23 @@ pub extern "C" fn gene_mean(app: *mut App, g: u32) -> f32 {
     }
 }
 
+/// Count of distinct living lineages (founding strains still represented).
+#[no_mangle]
+pub extern "C" fn strains(app: *mut App) -> u32 {
+    let app = unsafe { &*app };
+    let n = app.world.cfg.init_agents.max(1);
+    let mut seen = vec![false; n];
+    let mut count = 0u32;
+    for a in app.world.cells.iter().flatten() {
+        let s = a.strain as usize;
+        if s < n && !seen[s] {
+            seen[s] = true;
+            count += 1;
+        }
+    }
+    count
+}
+
 #[no_mangle]
 pub extern "C" fn free_app(app: *mut App) {
     if !app.is_null() {
