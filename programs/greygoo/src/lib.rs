@@ -21,6 +21,7 @@ use solana_program::{
 
 use sim_core::entropy::beacon_next;
 use sim_core::sector::{step, Cell, SECTOR_CELLS};
+use sim_core::Rng;
 
 const MAX_ENERGY: i32 = 2000;
 // Metabolism sink split (percent): 85 recycle / 10 burn / 5 keeper.
@@ -35,6 +36,8 @@ pub fn process_instruction(_pid: &Pubkey, accounts: &[AccountInfo], data: &[u8])
         0x00 => tick(accounts, rest),
         0x01 => seed(accounts, rest),
         0x02 => inject(accounts, rest),
+        0x03 => init_world(accounts, rest),
+        0x04 => init_sector(accounts, rest),
         _ => Err(ProgramError::InvalidInstructionData),
     }
 }
@@ -193,5 +196,75 @@ fn inject(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 
     treasury -= added;
     wr(&mut wd, TREASURY, treasury);
+    Ok(())
+}
+
+// ---- 0x03 INIT_WORLD: bootstrap a fresh (zeroed) world account ----
+// Permissionless, one-shot: only writes when the account is still zeroed.
+fn init_world(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
+    let it = &mut accounts.iter();
+    let world = next_account_info(it)?;
+    if !world.is_writable {
+        return Err(ProgramError::InvalidArgument);
+    }
+    if data.len() < 16 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let treasury = u64::from_le_bytes(data[0..8].try_into().unwrap());
+    let beacon = u64::from_le_bytes(data[8..16].try_into().unwrap());
+
+    let mut wd = world.try_borrow_mut_data()?;
+    if wd.len() < 40 {
+        return Err(ProgramError::AccountDataTooSmall);
+    }
+    if rd(&wd, EPOCH) != 0 || rd(&wd, TREASURY) != 0 {
+        return Err(ProgramError::AccountAlreadyInitialized);
+    }
+    wr(&mut wd, BEACON, beacon);
+    wr(&mut wd, EPOCH, 0);
+    wr(&mut wd, TREASURY, treasury);
+    wr(&mut wd, BURNED, 0);
+    wr(&mut wd, KEEPER, 0);
+    Ok(())
+}
+
+// ---- 0x04 INIT_SECTOR: fill a fresh sector with uniform habitat + agents ----
+// data: cap u8 | seed u64 | n_agents u16
+fn init_sector(accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
+    let it = &mut accounts.iter();
+    let sector = next_account_info(it)?;
+    if !sector.is_writable {
+        return Err(ProgramError::InvalidArgument);
+    }
+    if data.len() < 11 {
+        return Err(ProgramError::InvalidInstructionData);
+    }
+    let cap = data[0] as u16;
+    let seed = u64::from_le_bytes(data[1..9].try_into().unwrap());
+    let n = u16::from_le_bytes([data[9], data[10]]).min(SECTOR_CELLS as u16) as usize;
+
+    let mut bytes = sector.try_borrow_mut_data()?;
+    let cells = sector_cells(&mut bytes)?;
+    // uniform habitat, cleared of agents
+    for c in cells.iter_mut() {
+        c.cap = cap;
+        c.resource = cap;
+        c.alive = 0;
+    }
+    // scatter n agents on a full-period stride (239 is coprime with 256)
+    let mut rng = Rng::new(seed);
+    for i in 0..n {
+        let cell = (i * 239) % SECTOR_CELLS;
+        let mut g = [0u8; 8];
+        for b in g.iter_mut() {
+            *b = rng.byte();
+        }
+        cells[cell].genome = g;
+        cells[cell].energy = 40;
+        cells[cell].age = 0;
+        cells[cell].gen = 0;
+        cells[cell].strain = i as u32;
+        cells[cell].alive = 1;
+    }
     Ok(())
 }

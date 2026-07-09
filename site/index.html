@@ -75,6 +75,57 @@
   </div>
 </header>
 
+<section id="onchain" class="onchain rel sec-line">
+  <div class="wrap">
+    <div class="oc-head reveal">
+      <h2>Not a simulation <em>of</em> on-chain. It <em>is</em> on-chain.</h2>
+      <p>The same engine, deployed to Solana devnet. This sector lives in a real account and the field
+        below is fetched straight from the chain. Connect a devnet wallet and advance it, seed a strain,
+        or feed it resource — <b>every click is a real transaction</b>.</p>
+      <div class="oc-links mono">
+        <a id="lnk-program" target="_blank" rel="noopener">program ↗</a>
+        <a id="lnk-sector" target="_blank" rel="noopener">sector ↗</a>
+        <a id="lnk-world" target="_blank" rel="noopener">world ↗</a>
+        <a id="lnk-goo" target="_blank" rel="noopener">$GOO mint ↗</a>
+      </div>
+    </div>
+
+    <div class="oc-grid">
+      <div class="specimen oc-specimen reveal">
+        <div class="specimen-bar">
+          <span class="spec-id"><span class="live-dot"></span> DEVNET SECTOR · 16×16 · ON-CHAIN</span>
+          <span class="spec-readout mono"><span>EPOCH&nbsp;<b id="oc-epoch">–</b></span><span>POP&nbsp;<b id="oc-pop">–</b></span></span>
+        </div>
+        <div class="stage oc-stage">
+          <span class="tick tl"></span><span class="tick tr"></span>
+          <span class="tick bl"></span><span class="tick br"></span>
+          <canvas id="oc-grid" width="320" height="320"></canvas>
+        </div>
+        <div class="oc-econ">
+          <span class="metric"><span class="k">treasury</span> <b id="oc-treasury" class="mono">–</b></span>
+          <span class="metric"><span class="k">burned</span> <b id="oc-burned" class="mono">–</b></span>
+          <span class="metric good"><span class="k">keeper</span> <b id="oc-keeper" class="mono">–</b></span>
+        </div>
+      </div>
+
+      <div class="oc-panel reveal">
+        <div class="oc-wallet">
+          <button id="oc-connect" class="btn primary">Connect devnet wallet</button>
+          <span id="oc-addr" class="mono"></span>
+        </div>
+        <div class="oc-actions">
+          <button id="oc-tick" class="btn" disabled>▸&nbsp; Advance the world &nbsp;<span class="k mono">tick</span></button>
+          <button id="oc-seed" class="btn" disabled>✦&nbsp; Seed a strain &nbsp;<span class="k mono">seed</span></button>
+          <button id="oc-inject" class="btn" disabled>◈&nbsp; Inject resource &nbsp;<span class="k mono">inject</span></button>
+        </div>
+        <p class="oc-note">Needs <b>Phantom</b> set to <b>devnet</b>, funded from a faucet. Transactions are signed
+          by your wallet and sent to devnet; the sector is shared, so you may see others' agents too.</p>
+        <div id="oc-log" class="tx-log mono" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="premise" class="premise rel">
   <div class="wrap">
     <h2>Give simple rules a scarce resource and enough time, and <em>selection does the rest.</em></h2>
@@ -257,5 +308,6 @@
 </footer>
 
 <script src="app.js"></script>
+<script type="module" src="onchain.js"></script>
 </body>
 </html>

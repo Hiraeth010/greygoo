@@ -4,6 +4,17 @@ A fully on-chain, closed-system **evolutionary artificial-life simulation** for 
 
 **▶ Live — watch the real engine evolve in your browser: https://greygoo-hiraeth010s-projects.vercel.app**
 
+**⛓ Live on Solana devnet** — the program is deployed and the site can send real `tick` / `seed` / `inject` transactions from a Phantom wallet:
+
+| | address |
+|---|---|
+| Program | [`6mLbTSrKTU1xbrkpe2q2zpSr4xTy6DUJ2nnLiAb1CYDh`](https://explorer.solana.com/address/6mLbTSrKTU1xbrkpe2q2zpSr4xTy6DUJ2nnLiAb1CYDh?cluster=devnet) |
+| Sector | [`H8obp85KqoKVZkkJTpzCPtUwDZxQb5NanG6i9eLGTZQH`](https://explorer.solana.com/address/H8obp85KqoKVZkkJTpzCPtUwDZxQb5NanG6i9eLGTZQH?cluster=devnet) |
+| World | [`DbhomRJyicnvgiLJmky7YzR9Y9ByhsZsCJDuqEQp6fCE`](https://explorer.solana.com/address/DbhomRJyicnvgiLJmky7YzR9Y9ByhsZsCJDuqEQp6fCE?cluster=devnet) |
+| $GOO mint | [`AoWLSzrK2M1rctNKZjTHWGXJRfYzt9UdD8gTvqAiwzRk`](https://explorer.solana.com/address/AoWLSzrK2M1rctNKZjTHWGXJRfYzt9UdD8gTvqAiwzRk?cluster=devnet) (fixed supply 1,000,000,000, mint authority disabled) |
+
+Bootstrap / re-seed the on-chain world with `node devnet/bootstrap.mjs` (uses your `solana` devnet keypair). The `$GOO` matter counters live in-program today; binding the SPL mint to them via CPI (real burns / keeper payouts in `$GOO`) is the next step.
+
 The design rests on two lines of established prior art: **Avida / Tierra** show that self-replicating programs competing for a scarce resource in a closed, deterministic system produce real selection, speciation, and adaptive radiation; **Dark Forest / MUD / MagicBlock** show that fully-on-chain game state is viable. Grey Goo joins the two — the biology of the former, on the shared deterministic state of the latter.
 
 ## Status

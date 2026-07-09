@@ -278,4 +278,41 @@ fn main() {
         cells_after[7].resource, t1, t2, t1 - t2
     );
     println!("player actions verified on-chain ✅");
+
+    // ---- Experiment D: the devnet bootstrap sequence (zeroed → init → tick) ----
+    println!("\n== D. devnet bootstrap path (zeroed accounts → init → tick) ==");
+    let dsec = Pubkey::new_unique();
+    let dwld = Pubkey::new_unique();
+    // As `SystemProgram.createAccount` would leave them: zeroed, owned by program.
+    svm.set_account(dsec, owned_account(vec![0u8; SECTOR_CELLS * 32], program_id)).unwrap();
+    svm.set_account(dwld, owned_account(vec![0u8; 40], program_id)).unwrap();
+
+    let mut iw = vec![0x03u8];
+    iw.extend_from_slice(&500_000u64.to_le_bytes());
+    iw.extend_from_slice(&0xABCDu64.to_le_bytes());
+    let ix_iw = Instruction { program_id, accounts: vec![AccountMeta::new(dwld, false)], data: iw };
+
+    let mut is = vec![0x04u8, 8u8]; // opcode, cap=8
+    is.extend_from_slice(&0x1234u64.to_le_bytes()); // seed
+    is.extend_from_slice(&180u16.to_le_bytes()); // n_agents
+    let ix_is = Instruction { program_id, accounts: vec![AccountMeta::new(dsec, false)], data: is };
+
+    for (name, ix) in [("init_world", ix_iw), ("init_sector", ix_is)] {
+        svm.expire_blockhash();
+        let tx = Transaction::new(&[&payer], Message::new(&[ix], Some(&payer.pubkey())), svm.latest_blockhash());
+        let cu = svm.send_transaction(tx).expect(name).compute_units_consumed;
+        println!("{:>12}: ok ({} CU)", name, cu);
+    }
+    let pop0 = alive_count(&svm.get_account(&dsec).unwrap().data);
+    // advance a few ticks
+    for e in 1..=10u64 {
+        svm.expire_blockhash();
+        let tx = Transaction::new(&[&payer], Message::new(&[tick_ix(program_id, dsec, dwld)], Some(&payer.pubkey())), svm.latest_blockhash());
+        svm.send_transaction(tx).expect("tick after init");
+        let _ = e;
+    }
+    let pop1 = alive_count(&svm.get_account(&dsec).unwrap().data);
+    let w = read_world(&svm, &dwld);
+    println!("seeded pop {} → after 10 ticks {} · treasury {} burned {} keeper {}", pop0, pop1, w.treasury, w.burned, w.keeper);
+    println!("bootstrap path verified ✅ (this is exactly what the devnet client runs)");
 }
