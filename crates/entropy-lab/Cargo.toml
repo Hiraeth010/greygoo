@@ -1,0 +1,9 @@
+[package]
+name = "entropy-lab"
+version = "0.1.0"
+edition = "2021"
+
+# Adversarial measurement of the Phase 3 entropy design: how much can a block
+# leader who grinds G candidate slot-entropy values bias mutation outcomes?
+[dependencies]
+sim-core = { path = "../sim-core" }

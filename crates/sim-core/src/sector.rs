@@ -10,7 +10,8 @@
 //! `mutate`, and the trait-mapping fns from the crate root, so the biology
 //! cannot silently diverge between the prototype and the chain.
 
-use crate::{harvest_cap, metab_cost, mutate, repro_threshold, Genome, Rng, DORM, MOVE, SPLIT, AGGR};
+use crate::entropy::agent_seed;
+use crate::{harvest_cap, metab_cost, mutate, repro_threshold, Genome, Rng, AGGR, DORM, MOVE, SPLIT};
 
 pub const SECTOR_W: usize = 16;
 pub const SECTOR_H: usize = 16;
@@ -85,11 +86,12 @@ fn best_empty(cells: &[Cell], nb: &[usize; 4]) -> Option<usize> {
     best
 }
 
-/// Advance one sector one tick. `seed` is the tick's entropy (on-chain: derived
-/// from slot hash ⊕ sector id ⊕ epoch); `epoch` disambiguates repeated seeds.
-pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, seed: u64, epoch: u64) {
+/// Advance one sector one tick. `beacon` is this tick's committed entropy
+/// (on-chain: the epoch-ahead beacon; see [`crate::entropy`]); `sector_id` and
+/// `epoch` key each agent's mutation stream so agents are decorrelated under a
+/// shared beacon — a leader grinding `beacon` cannot steer the whole sector.
+pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector_id: u64, epoch: u64) {
     debug_assert_eq!(cells.len(), SECTOR_CELLS);
-    let mut rng = Rng::new(seed ^ epoch.rotate_left(17));
 
     // 1. Resource regrowth.
     for c in cells.iter_mut() {
@@ -112,6 +114,9 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, seed: u64, epoch: u
         let age = cells[i].age.saturating_add(1);
         let gen = cells[i].gen;
         let strain = cells[i].strain;
+
+        // Per-agent entropy stream, keyed by this agent's immutable identity.
+        let mut arng = Rng::new(agent_seed(beacon, sector_id, i as u64, strain as u64, epoch));
 
         // -- harvest current cell --
         let h = cells[i].resource.min(harvest_cap(&genome));
@@ -143,15 +148,15 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, seed: u64, epoch: u
                 let split = genome[SPLIT] as i32;
                 let child_energy = (energy * split / 255).clamp(1, energy - 1);
                 energy -= child_energy;
-                let child_genome = mutate(genome, &mut rng);
+                let child_genome = mutate(genome, &mut arng);
                 cells[k].become_agent(child_genome, child_energy, 0, gen.saturating_add(1), strain);
                 bit_set(&mut moved, k);
             }
         }
 
         // -- movement / predation --
-        let move_roll = rng.chance(genome[MOVE]);
-        let aggr_roll = rng.chance(genome[AGGR]);
+        let move_roll = arng.chance(genome[MOVE]);
+        let aggr_roll = arng.chance(genome[AGGR]);
         let mut target = i;
 
         if move_roll {

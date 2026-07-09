@@ -19,8 +19,17 @@ use solana_sdk::{
     message::Message,
     pubkey::Pubkey,
     signature::{Keypair, Signer},
+    sysvar::slot_hashes,
     transaction::Transaction,
 };
+
+/// World beacon account: beacon u64 | epoch u64 (little-endian).
+fn world_data(beacon: u64, epoch: u64) -> Vec<u8> {
+    let mut d = Vec::with_capacity(16);
+    d.extend_from_slice(&beacon.to_le_bytes());
+    d.extend_from_slice(&epoch.to_le_bytes());
+    d
+}
 
 const MAX_TX_CU: u64 = 1_400_000; // hard per-transaction ceiling
 const REGEN: u16 = 1;
@@ -67,12 +76,28 @@ fn build_sector(k: usize, seed: u64) -> (Vec<u8>, usize) {
     (bytemuck::cast_slice::<Cell, u8>(&cells).to_vec(), placed)
 }
 
-fn instruction_data(seed: u64, epoch: u64) -> Vec<u8> {
-    let mut d = Vec::with_capacity(18);
-    d.extend_from_slice(&seed.to_le_bytes());
-    d.extend_from_slice(&epoch.to_le_bytes());
-    d.extend_from_slice(&REGEN.to_le_bytes());
-    d
+fn tick_ix(program_id: Pubkey, sector: Pubkey, world: Pubkey) -> Instruction {
+    Instruction {
+        program_id,
+        accounts: vec![
+            AccountMeta::new(sector, false),
+            AccountMeta::new(world, false),
+            AccountMeta::new_readonly(slot_hashes::id(), false),
+        ],
+        data: REGEN.to_le_bytes().to_vec(),
+    }
+}
+
+fn owned_account(data: Vec<u8>, owner: Pubkey) -> Account {
+    Account { lamports: 1_000_000_000, data, owner, executable: false, rent_epoch: 0 }
+}
+
+fn read_beacon(svm: &LiteSVM, world: &Pubkey) -> (u64, u64) {
+    let d = svm.get_account(world).unwrap().data;
+    (
+        u64::from_le_bytes(d[0..8].try_into().unwrap()),
+        u64::from_le_bytes(d[8..16].try_into().unwrap()),
+    )
 }
 
 fn alive_count(data: &[u8]) -> usize {
@@ -104,24 +129,12 @@ fn main() {
     println!("{:>6}  {:>7}  {:>9}  {:>9}", "agents", "CU", "CU/agent", "under1.4M");
     for &k in &[16usize, 32, 64, 96, 128, 160, 192, 224, 256] {
         let sector_pk = Pubkey::new_unique();
+        let world_pk = Pubkey::new_unique();
         let (data, placed) = build_sector(k, 0xABCD_0000 + k as u64);
-        svm.set_account(
-            sector_pk,
-            Account {
-                lamports: 1_000_000_000,
-                data,
-                owner: program_id,
-                executable: false,
-                rent_epoch: 0,
-            },
-        )
-        .unwrap();
+        svm.set_account(sector_pk, owned_account(data, program_id)).unwrap();
+        svm.set_account(world_pk, owned_account(world_data(0xF00D_BEEF, 0), program_id)).unwrap();
 
-        let ix = Instruction {
-            program_id,
-            accounts: vec![AccountMeta::new(sector_pk, false)],
-            data: instruction_data(0xF00D, 1),
-        };
+        let ix = tick_ix(program_id, sector_pk, world_pk);
         let msg = Message::new(&[ix], Some(&payer.pubkey()));
         let tx = Transaction::new(&[&payer], msg, svm.latest_blockhash());
         match svm.send_transaction(tx) {
@@ -138,31 +151,20 @@ fn main() {
     // ---- Experiment B: evolution trace (persistent account, 200 ticks) ----
     println!("\n== B. evolution trace (200 consecutive ticks, full sector) ==");
     let sector_pk = Pubkey::new_unique();
+    let world_pk = Pubkey::new_unique();
     let (data, placed) = build_sector(256, 0x1234);
-    svm.set_account(
-        sector_pk,
-        Account {
-            lamports: 1_000_000_000,
-            data,
-            owner: program_id,
-            executable: false,
-            rent_epoch: 0,
-        },
-    )
-    .unwrap();
+    svm.set_account(sector_pk, owned_account(data, program_id)).unwrap();
+    svm.set_account(world_pk, owned_account(world_data(0xF00D_BEEF, 0), program_id)).unwrap();
 
     let mut max_cu = 0u64;
     let mut sum_cu = 0u64;
     let mut min_cu = u64::MAX;
     let ticks = 200u64;
     println!("start pop = {}", placed);
-    println!("{:>5}  {:>7}  {:>4}", "tick", "CU", "pop");
+    println!("{:>5}  {:>7}  {:>4}  {:>18}", "tick", "CU", "pop", "beacon");
     for epoch in 1..=ticks {
-        let ix = Instruction {
-            program_id,
-            accounts: vec![AccountMeta::new(sector_pk, false)],
-            data: instruction_data(0x5EED, epoch),
-        };
+        svm.expire_blockhash(); // fresh blockhash → distinct tx signature each tick
+        let ix = tick_ix(program_id, sector_pk, world_pk);
         let msg = Message::new(&[ix], Some(&payer.pubkey()));
         let tx = Transaction::new(&[&payer], msg, svm.latest_blockhash());
         let meta = svm.send_transaction(tx).expect("tick tx");
@@ -172,9 +174,12 @@ fn main() {
         sum_cu += cu;
         if epoch % 25 == 0 || epoch == 1 {
             let acc = svm.get_account(&sector_pk).unwrap();
-            println!("{:>5}  {:>7}  {:>4}", epoch, cu, alive_count(&acc.data));
+            let (beacon, _ep) = read_beacon(&svm, &world_pk);
+            println!("{:>5}  {:>7}  {:>4}  {:>#18x}", epoch, cu, alive_count(&acc.data), beacon);
         }
     }
+    let (final_beacon, final_epoch) = read_beacon(&svm, &world_pk);
+    println!("beacon chained to {:#x} at epoch {}", final_beacon, final_epoch);
 
     // ---- Verdict ----
     let final_pop = alive_count(&svm.get_account(&sector_pk).unwrap().data);

@@ -10,8 +10,8 @@ The design rests on two lines of established prior art: **Avida / Tierra** show 
 |-------|------|-------|
 | **1. ALife core** | Prove evolution actually emerges (off-chain, deterministic) | ✅ **Done** |
 | **2. Compute budget** | Benchmark real CU per sector tick on-chain (the go/no-go gate) | ✅ **Done** |
-| 3. Randomness | Tiered entropy: state-mixed slot hash + epoch-ahead VRF beacon | ⏳ Next |
-| 4. Tokenomics | Faucet-and-drain resource economy, keeper rewards, replication burns | — |
+| **3. Randomness** | Tiered entropy: per-agent keyed slot hash + epoch-ahead VRF beacon | ✅ **Done** |
+| 4. Tokenomics | Faucet-and-drain resource economy, keeper rewards, replication burns | ⏳ Next |
 | 5. Player layer | Strain seeding, resource injection | — |
 
 ## Phase 2 result — the compute budget closes
@@ -26,9 +26,29 @@ The `tick` runs as real SBF bytecode (`programs/greygoo`), advancing one 16×16 
 
 - **~300 CU per agent**, statically bounded (one pass over a fixed 256 cells, no allocation).
 - Worst-case full sector = **77K CU** → **18 full sectors fit in one transaction**, and a 256-sector (256×256) world advances fully in ~14 tick-txs — trivially within a block, and the txs touch disjoint accounts so they parallelize.
-- The on-chain biology is live: a seeded full sector evolves down to a stable ~9–15 agents over 200 consecutive on-chain ticks.
+- The on-chain biology is live: a seeded full sector evolves down to a stable population over 200 consecutive on-chain ticks.
 
-The compute budget closes with three orders of magnitude of headroom. Phase 2 was the real go/no-go, and it passes.
+The compute budget closes with three orders of magnitude of headroom. Phase 2 was the real go/no-go, and it passes. *(With the Phase 3 entropy wiring added — the epoch-ahead beacon account + a SlotHashes read — the worst-case tick rises to ~89K CU, i.e. 15 sectors/tx: still the same conclusion.)*
+
+## Phase 3 result — tiered entropy, with the manipulation measured
+
+Native Solana entropy is **grindable** by the block leader; true VRF is **asynchronous** and can't seed a same-instruction mutation. Grey Goo tiers it (`sim-core::entropy`, wired in `programs/greygoo`):
+
+- **Per-tick mutation** uses a cheap synchronous seed, but each agent's stream is keyed by its own identity — `agent_seed(beacon, sector, cell, strain, epoch)` — so agents are decorrelated.
+- **The epoch beacon** is committed one tick ahead (from this slot's SlotHashes today, a **VRF value** later) and `sector_id` is bound to the sector's address so the caller can't choose it.
+
+We didn't just assert this is safe — `crates/entropy-lab` **measures** what a leader grinding G candidate slot hashes can achieve (rare-event base rate p0 ≈ 0.49%):
+
+| | G=16 | G=256 | G=4096 |
+|---|---|---|---|
+| **Targeted** (one known agent), naive **or** mixed | 7% | 71% | **100%** |
+| **Targeted**, VRF | 0.49% | 0.49% | **0.49%** |
+| **Broad** (# of 64 agents flipped at once), naive reuse | 4.9 | 46 | **64** |
+| **Broad**, per-agent mixed | 1.5 | 2.7 | **3.8** |
+
+Two precise conclusions fall out:
+1. **Per-agent keying kills broad/population steering** — a single grind moves ~4 of 64 agents instead of all 64. This is what the shipped `sector::step` does.
+2. **It does *not* protect a single targeted outcome** — grindable entropy makes any rare event forceable, and mixing doesn't change that. So per-tick mutation must stay **micro-stakes** (one gene ±8, which it is), and **nothing valuable may depend on it**. Anything macro/valuable uses the VRF beacon — the only design that holds at p0 under grinding.
 
 ## Phase 1 result — evolution is real
 
@@ -52,8 +72,9 @@ crates/
               the off-chain sim and the on-chain program (the `sector` module is
               the zero-copy on-chain representation)
   sim-run/    off-chain driver: seeds random genomes, runs N epochs, emits metrics + a verdict
+  entropy-lab/ adversarial harness: measures how much a grinding leader can bias mutation
 programs/
-  greygoo/    native Solana (SBF) program: the on-chain `tick` running sim_core::sector::step
+  greygoo/    native Solana (SBF) program: on-chain `tick` (sector::step + epoch-ahead beacon)
 bench/
   cu-bench/   LiteSVM harness: runs the real .so and reports compute units per tick
 ```

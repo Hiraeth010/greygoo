@@ -23,6 +23,9 @@
 /// Fixed-layout, zero-copy, alloc-free sector representation used on-chain.
 pub mod sector;
 
+/// Tiered on-chain entropy (per-agent keyed seeds + epoch-ahead beacon chaining).
+pub mod entropy;
+
 // ---------------------------------------------------------------------------
 // Deterministic PRNG (splitmix64). Stands in for on-chain hash-derived entropy.
 // ---------------------------------------------------------------------------
