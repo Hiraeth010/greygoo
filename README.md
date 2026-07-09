@@ -11,8 +11,8 @@ The design rests on two lines of established prior art: **Avida / Tierra** show 
 | **1. ALife core** | Prove evolution actually emerges (off-chain, deterministic) | ✅ **Done** |
 | **2. Compute budget** | Benchmark real CU per sector tick on-chain (the go/no-go gate) | ✅ **Done** |
 | **3. Randomness** | Tiered entropy: per-agent keyed slot hash + epoch-ahead VRF beacon | ✅ **Done** |
-| 4. Tokenomics | Faucet-and-drain resource economy, keeper rewards, replication burns | ⏳ Next |
-| 5. Player layer | Strain seeding, resource injection | — |
+| **4. Tokenomics** | Conserved-matter faucet-and-drain, adaptive faucet, keeper rewards, burn | ✅ **Done** (spec + sim) |
+| 5. Player layer | Strain seeding, resource injection | ⏳ Next |
 
 ## Phase 2 result — the compute budget closes
 
@@ -73,6 +73,7 @@ crates/
               the zero-copy on-chain representation)
   sim-run/    off-chain driver: seeds random genomes, runs N epochs, emits metrics + a verdict
   entropy-lab/ adversarial harness: measures how much a grinding leader can bias mutation
+  econ-lab/   economy harness: faucet/burn/keeper accounting over the real engine; regime sweep
 programs/
   greygoo/    native Solana (SBF) program: on-chain `tick` (sector::step + epoch-ahead beacon)
 bench/
@@ -88,6 +89,30 @@ cargo run --release --bin sim-run -- 4000 1 2 3
 ```
 
 Prints per-epoch instruments and a final verdict, and writes per-seed CSVs to `out/`.
+
+## Phase 4 result — a token economy that stays scarce
+
+Full design in [PHASE4-ECONOMY.md](PHASE4-ECONOMY.md). Matter is **conserved**
+(`MAX_SUPPLY = treasury + in-world + burned + keeper_pool`): a treasury faucet
+feeds cells, metabolism returns matter split **85% recycle / 10% burn / 5%
+keeper**. `crates/econ-lab` wraps the *real* engine with this accounting and
+measures the regimes (uniform habitat so the faucet is the sole control):
+
+- **A constant faucet is a knife-edge** — regen 0 → death spiral, regen 8 →
+  ghost town (matter pools, free 73%), only the middle band is healthy. The
+  biology shows it: in the healthy band scarcity keeps `metab` selected **down**
+  (~12–18); in the ghost town selection **relaxes** (`metab` drifts up to ~22).
+- **The adaptive faucet self-stabilizes** at the target population with scarcity
+  intact (free ~30%, `metab` ~15) and stays healthy across a **5× range of
+  treasury sizes** — the recycle loop sustains it even after the buffer draws
+  down. ~6.6% burned over 2,500 epochs = slow deflation, no spiral.
+- **Keepers are paid** ≈4 matter per sector-tick, activity-proportional, so busy
+  sectors self-fund their upkeep (fine on cheap entropy; per the Phase 3 rule,
+  only *valuable discrete* payouts use the VRF beacon).
+
+```sh
+cargo run --release -p econ-lab
+```
 
 ## Watch it evolve (browser)
 

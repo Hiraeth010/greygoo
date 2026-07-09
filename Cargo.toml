@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/sim-core", "crates/sim-run", "crates/entropy-lab"]
+members = ["crates/sim-core", "crates/sim-run", "crates/entropy-lab", "crates/econ-lab"]
 # The SBF program and the LiteSVM bench resolve their own (heavy) Solana deps
 # and target, so they are kept out of the host workspace to avoid feature
 # unification clashes. Build them via their own manifests.

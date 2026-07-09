@@ -148,6 +148,10 @@ pub struct Config {
     pub init_agents: usize,
     pub init_energy: i32,
     pub max_energy: i32,
+    /// If true, every cell has capacity `cap_max` (uniform habitat) instead of
+    /// two sugarscape peaks. Makes the faucet (`regen`) the sole carrying-capacity
+    /// control — used by the economic sweeps.
+    pub uniform: bool,
 }
 
 impl Default for Config {
@@ -160,6 +164,7 @@ impl Default for Config {
             init_agents: 3000,
             init_energy: 40,
             max_energy: 2000,
+            uniform: false,
         }
     }
 }
@@ -174,6 +179,10 @@ pub struct World {
     pub rng: Rng,
     pub births: u64,
     pub deaths: u64,
+    /// Matter the faucet (regrowth) added last step — a source for accounting.
+    pub em_emitted: u64,
+    /// Matter metabolism consumed last step — the primary sink for accounting.
+    pub em_metabolized: u64,
 }
 
 #[cfg(feature = "std")]
@@ -189,6 +198,9 @@ impl World {
             (2 * cfg.width / 3, 2 * cfg.height / 3),
         ];
         let mut cap = vec![0u16; n];
+        if cfg.uniform {
+            cap.iter_mut().for_each(|c| *c = cfg.cap_max);
+        } else {
         for y in 0..cfg.height {
             for x in 0..cfg.width {
                 // Toroidal-aware nearest-peak falloff, integer only.
@@ -212,6 +224,7 @@ impl World {
                 };
                 cap[y * cfg.width + x] = c as u16;
             }
+        }
         }
         let resource = cap.clone();
 
@@ -251,7 +264,23 @@ impl World {
             rng,
             births: 0,
             deaths: 0,
+            em_emitted: 0,
+            em_metabolized: 0,
         }
+    }
+
+    /// Total free matter sitting in cells (the faucet reservoir in-world).
+    pub fn total_resource(&self) -> u64 {
+        self.resource.iter().map(|&r| r as u64).sum()
+    }
+
+    /// Total matter bound in living biomass.
+    pub fn total_energy(&self) -> u64 {
+        self.cells
+            .iter()
+            .filter_map(|c| c.as_ref())
+            .map(|a| a.energy.max(0) as u64)
+            .sum()
     }
 
     #[inline]
@@ -272,12 +301,16 @@ impl World {
         self.epoch += 1;
         let epoch = self.epoch;
         let n = self.cells.len();
+        self.em_emitted = 0;
+        self.em_metabolized = 0;
 
-        // 1. Resource regrowth.
+        // 1. Resource regrowth (the faucet).
         for i in 0..n {
             let c = self.cap[i];
             if self.resource[i] < c {
-                self.resource[i] = (self.resource[i] + self.cfg.regen).min(c);
+                let before = self.resource[i];
+                self.resource[i] = (before + self.cfg.regen).min(c);
+                self.em_emitted += (self.resource[i] - before) as u64;
             }
         }
 
@@ -308,6 +341,7 @@ impl World {
                 cost = 1 + (cost - 1) * (255 - dorm) / 255;
             }
             agent.energy -= cost;
+            self.em_metabolized += cost as u64;
 
             // -- death --
             if agent.energy <= 0 {

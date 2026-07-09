@@ -1,0 +1,10 @@
+[package]
+name = "econ-lab"
+version = "0.1.0"
+edition = "2021"
+
+# Wraps the real World with a conserved-matter token economy (treasury faucet +
+# burn/keeper/recycle sinks) and measures whether it maintains scarcity and
+# avoids the ghost-town / death-spiral failure modes across parameter regimes.
+[dependencies]
+sim-core = { path = "../sim-core" }
