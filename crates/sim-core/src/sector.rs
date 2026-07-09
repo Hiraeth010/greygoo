@@ -86,17 +86,31 @@ fn best_empty(cells: &[Cell], nb: &[usize; 4]) -> Option<usize> {
     best
 }
 
+/// Matter flows and vital stats from one sector tick — consumed by the on-chain
+/// economy (faucet cost + metabolism sink) and useful for telemetry.
+#[derive(Clone, Copy, Default)]
+pub struct StepStats {
+    pub emitted: u64,     // matter the faucet added (a treasury cost)
+    pub metabolized: u64, // matter metabolism consumed (the sink to split)
+    pub births: u32,
+    pub deaths: u32,
+}
+
 /// Advance one sector one tick. `beacon` is this tick's committed entropy
 /// (on-chain: the epoch-ahead beacon; see [`crate::entropy`]); `sector_id` and
 /// `epoch` key each agent's mutation stream so agents are decorrelated under a
 /// shared beacon — a leader grinding `beacon` cannot steer the whole sector.
-pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector_id: u64, epoch: u64) {
+/// Returns the [`StepStats`] the economy layer meters.
+pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector_id: u64, epoch: u64) -> StepStats {
     debug_assert_eq!(cells.len(), SECTOR_CELLS);
+    let mut stats = StepStats::default();
 
-    // 1. Resource regrowth.
+    // 1. Resource regrowth (the faucet).
     for c in cells.iter_mut() {
         if c.resource < c.cap {
+            let before = c.resource;
             c.resource = (c.resource + regen).min(c.cap);
+            stats.emitted += (c.resource - before) as u64;
         }
     }
 
@@ -130,10 +144,12 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector
             cost = 1 + (cost - 1) * (255 - dorm) / 255;
         }
         energy -= cost;
+        stats.metabolized += cost as u64;
 
         // -- death --
         if energy <= 0 {
             cells[i].alive = 0;
+            stats.deaths += 1;
             continue;
         }
         if energy > max_energy {
@@ -151,6 +167,7 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector
                 let child_genome = mutate(genome, &mut arng);
                 cells[k].become_agent(child_genome, child_energy, 0, gen.saturating_add(1), strain);
                 bit_set(&mut moved, k);
+                stats.births += 1;
             }
         }
 
@@ -178,6 +195,7 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector
             if let Some(k) = victim {
                 let gained = cells[k].energy / 2;
                 cells[k].alive = 0;
+                stats.deaths += 1;
                 energy = (energy + gained).min(max_energy);
                 target = k;
             }
@@ -190,4 +208,6 @@ pub fn step(cells: &mut [Cell], regen: u16, max_energy: i32, beacon: u64, sector
         cells[target].become_agent(genome, energy, age, gen, strain);
         bit_set(&mut moved, target);
     }
+
+    stats
 }

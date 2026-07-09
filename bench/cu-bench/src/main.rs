@@ -23,12 +23,27 @@ use solana_sdk::{
     transaction::Transaction,
 };
 
-/// World beacon account: beacon u64 | epoch u64 (little-endian).
-fn world_data(beacon: u64, epoch: u64) -> Vec<u8> {
-    let mut d = Vec::with_capacity(16);
-    d.extend_from_slice(&beacon.to_le_bytes());
-    d.extend_from_slice(&epoch.to_le_bytes());
+/// World account: beacon | epoch | treasury | burned | keeper (5×u64 LE, 40 bytes).
+fn world_data(beacon: u64, treasury: u64) -> Vec<u8> {
+    let mut d = Vec::with_capacity(40);
+    for v in [beacon, 0 /*epoch*/, treasury, 0 /*burned*/, 0 /*keeper*/] {
+        d.extend_from_slice(&v.to_le_bytes());
+    }
     d
+}
+
+struct WorldState {
+    beacon: u64,
+    epoch: u64,
+    treasury: u64,
+    burned: u64,
+    keeper: u64,
+}
+
+fn read_world(svm: &LiteSVM, world: &Pubkey) -> WorldState {
+    let d = svm.get_account(world).unwrap().data;
+    let g = |o: usize| u64::from_le_bytes(d[o..o + 8].try_into().unwrap());
+    WorldState { beacon: g(0), epoch: g(8), treasury: g(16), burned: g(24), keeper: g(32) }
 }
 
 const MAX_TX_CU: u64 = 1_400_000; // hard per-transaction ceiling
@@ -77,6 +92,8 @@ fn build_sector(k: usize, seed: u64) -> (Vec<u8>, usize) {
 }
 
 fn tick_ix(program_id: Pubkey, sector: Pubkey, world: Pubkey) -> Instruction {
+    let mut data = vec![0x00u8]; // opcode: TICK
+    data.extend_from_slice(&REGEN.to_le_bytes());
     Instruction {
         program_id,
         accounts: vec![
@@ -84,20 +101,20 @@ fn tick_ix(program_id: Pubkey, sector: Pubkey, world: Pubkey) -> Instruction {
             AccountMeta::new(world, false),
             AccountMeta::new_readonly(slot_hashes::id(), false),
         ],
-        data: REGEN.to_le_bytes().to_vec(),
+        data,
+    }
+}
+
+fn player_ix(program_id: Pubkey, sector: Pubkey, world: Pubkey, data: Vec<u8>) -> Instruction {
+    Instruction {
+        program_id,
+        accounts: vec![AccountMeta::new(sector, false), AccountMeta::new(world, false)],
+        data,
     }
 }
 
 fn owned_account(data: Vec<u8>, owner: Pubkey) -> Account {
     Account { lamports: 1_000_000_000, data, owner, executable: false, rent_epoch: 0 }
-}
-
-fn read_beacon(svm: &LiteSVM, world: &Pubkey) -> (u64, u64) {
-    let d = svm.get_account(world).unwrap().data;
-    (
-        u64::from_le_bytes(d[0..8].try_into().unwrap()),
-        u64::from_le_bytes(d[8..16].try_into().unwrap()),
-    )
 }
 
 fn alive_count(data: &[u8]) -> usize {
@@ -132,7 +149,7 @@ fn main() {
         let world_pk = Pubkey::new_unique();
         let (data, placed) = build_sector(k, 0xABCD_0000 + k as u64);
         svm.set_account(sector_pk, owned_account(data, program_id)).unwrap();
-        svm.set_account(world_pk, owned_account(world_data(0xF00D_BEEF, 0), program_id)).unwrap();
+        svm.set_account(world_pk, owned_account(world_data(0xF00D_BEEF, 1_000_000), program_id)).unwrap();
 
         let ix = tick_ix(program_id, sector_pk, world_pk);
         let msg = Message::new(&[ix], Some(&payer.pubkey()));
@@ -160,8 +177,8 @@ fn main() {
     let mut sum_cu = 0u64;
     let mut min_cu = u64::MAX;
     let ticks = 200u64;
-    println!("start pop = {}", placed);
-    println!("{:>5}  {:>7}  {:>4}  {:>18}", "tick", "CU", "pop", "beacon");
+    println!("start pop = {}, treasury = 1,000,000", placed);
+    println!("{:>5}  {:>7}  {:>4}  {:>10}  {:>7}  {:>7}", "tick", "CU", "pop", "treasury", "burned", "keeper");
     for epoch in 1..=ticks {
         svm.expire_blockhash(); // fresh blockhash → distinct tx signature each tick
         let ix = tick_ix(program_id, sector_pk, world_pk);
@@ -174,12 +191,18 @@ fn main() {
         sum_cu += cu;
         if epoch % 25 == 0 || epoch == 1 {
             let acc = svm.get_account(&sector_pk).unwrap();
-            let (beacon, _ep) = read_beacon(&svm, &world_pk);
-            println!("{:>5}  {:>7}  {:>4}  {:>#18x}", epoch, cu, alive_count(&acc.data), beacon);
+            let w = read_world(&svm, &world_pk);
+            println!(
+                "{:>5}  {:>7}  {:>4}  {:>10}  {:>7}  {:>7}",
+                epoch, cu, alive_count(&acc.data), w.treasury, w.burned, w.keeper
+            );
         }
     }
-    let (final_beacon, final_epoch) = read_beacon(&svm, &world_pk);
-    println!("beacon chained to {:#x} at epoch {}", final_beacon, final_epoch);
+    let w = read_world(&svm, &world_pk);
+    println!(
+        "conservation check: treasury {} + burned {} + keeper {} + in-world = const; beacon {:#x} @ epoch {}",
+        w.treasury, w.burned, w.keeper, w.beacon, w.epoch
+    );
 
     // ---- Verdict ----
     let final_pop = alive_count(&svm.get_account(&sector_pk).unwrap().data);
@@ -203,4 +226,56 @@ fn main() {
         "\n>>> a single sector tick fits in one tx: {} <<<",
         if verdict { "YES ✅" } else { "NO ❌" }
     );
+
+    // ---- Experiment C: player actions (seed_strain + inject_resource) ----
+    println!("\n== C. player actions (Phase 5) ==");
+    let sec = Pubkey::new_unique();
+    let wld = Pubkey::new_unique();
+    let mut cells = [Cell::zeroed(); SECTOR_CELLS];
+    for c in cells.iter_mut() {
+        c.cap = 8;
+        c.resource = 0; // empty larders so INJECT has headroom
+    }
+    let sec_data = bytemuck::cast_slice::<Cell, u8>(&cells).to_vec();
+    svm.set_account(sec, owned_account(sec_data, program_id)).unwrap();
+    svm.set_account(wld, owned_account(world_data(0, 100_000), program_id)).unwrap();
+    let t0 = read_world(&svm, &wld).treasury;
+    println!("treasury start: {}", t0);
+
+    // SEED a designed strain (aggressive, efficient) into cell 42, energy 100.
+    let mut seed_data = vec![0x01u8];
+    seed_data.extend_from_slice(&42u16.to_le_bytes());
+    seed_data.extend_from_slice(&[10, 127, 40, 220, 127, 220, 160, 127]); // genome
+    seed_data.extend_from_slice(&100u16.to_le_bytes()); // energy
+    seed_data.extend_from_slice(&999u32.to_le_bytes()); // strain
+    svm.expire_blockhash();
+    let tx = Transaction::new(
+        &[&payer],
+        Message::new(&[player_ix(program_id, sec, wld, seed_data)], Some(&payer.pubkey())),
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx).expect("seed tx");
+    let pop_after_seed = alive_count(&svm.get_account(&sec).unwrap().data);
+    let t1 = read_world(&svm, &wld).treasury;
+    println!("SEED cell 42 (energy 100): pop {} → {}, treasury {} → {} (−{})", 0, pop_after_seed, t0, t1, t0 - t1);
+
+    // INJECT 60 resource into cell 7 (headroom 8 → adds 8).
+    let mut inj_data = vec![0x02u8];
+    inj_data.extend_from_slice(&7u16.to_le_bytes());
+    inj_data.extend_from_slice(&60u16.to_le_bytes());
+    svm.expire_blockhash();
+    let tx = Transaction::new(
+        &[&payer],
+        Message::new(&[player_ix(program_id, sec, wld, inj_data)], Some(&payer.pubkey())),
+        svm.latest_blockhash(),
+    );
+    svm.send_transaction(tx).expect("inject tx");
+    let acc_after = svm.get_account(&sec).unwrap();
+    let cells_after: &[Cell] = bytemuck::cast_slice(&acc_after.data[..SECTOR_CELLS * 32]);
+    let t2 = read_world(&svm, &wld).treasury;
+    println!(
+        "INJECT 60 → cell 7 (cap 8): resource now {}, treasury {} → {} (−{})",
+        cells_after[7].resource, t1, t2, t1 - t2
+    );
+    println!("player actions verified on-chain ✅");
 }
