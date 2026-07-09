@@ -1,0 +1,15 @@
+[package]
+name = "cu-bench"
+version = "0.1.0"
+edition = "2021"
+
+# Standalone (excluded from the host workspace): pulls the heavy LiteSVM +
+# Agave stack to run real SBF bytecode in-process and read compute units.
+[dependencies]
+litesvm = "=0.13.1"
+# Pinned to the 3.x umbrella so the split solana crates unify with litesvm's
+# (litesvm 0.13.1 targets the 3.x sdk crates; solana-sdk 4.0 drags in a broken
+# 4.0 solana-message and a duplicate 4.x crate set).
+solana-sdk = "=3.0.0"
+bytemuck = { version = "1", features = ["derive"] }
+sim-core = { path = "../../crates/sim-core" }

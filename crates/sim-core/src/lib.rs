@@ -12,6 +12,16 @@
 //! evolvable genes that parameterise a fixed O(1) behaviour loop — no opcode
 //! interpreter, so per-agent work is statically bounded (the property the
 //! on-chain `tick` will need).
+//!
+//! The crate is `no_std`-capable: `Rng`, the genome primitives, and the
+//! fixed-layout [`sector`] module (the on-chain representation) compile without
+//! `std`. The off-chain `World`/`Metrics` (which use `Vec`/`HashMap`/floats)
+//! are gated behind the default `std` feature.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+/// Fixed-layout, zero-copy, alloc-free sector representation used on-chain.
+pub mod sector;
 
 // ---------------------------------------------------------------------------
 // Deterministic PRNG (splitmix64). Stands in for on-chain hash-derived entropy.
@@ -82,7 +92,7 @@ const MUT_FLOOR: u8 = 6;
 pub type Genome = [u8; GENES];
 
 #[inline]
-fn mutate(mut g: Genome, rng: &mut Rng) -> Genome {
+pub fn mutate(mut g: Genome, rng: &mut Rng) -> Genome {
     let thr = MUT_FLOOR.saturating_add(g[MUT] / 8); // ~2.3%..14% per gene
     for gene in g.iter_mut() {
         if rng.chance(thr) {
@@ -97,6 +107,7 @@ fn mutate(mut g: Genome, rng: &mut Rng) -> Genome {
 // Agent
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "std")]
 #[derive(Clone)]
 pub struct Agent {
     pub genome: Genome,
@@ -107,17 +118,18 @@ pub struct Agent {
     acted: u64,     // last epoch this agent acted (async-update guard)
 }
 
-// Derived traits (kept as free fns so the mapping is explicit and portable).
+// Derived traits (kept as free fns so the mapping is explicit and portable —
+// shared verbatim by the off-chain `World` and the on-chain `sector`).
 #[inline]
-fn metab_cost(g: &Genome) -> i32 {
+pub fn metab_cost(g: &Genome) -> i32 {
     1 + (g[METAB] as i32) / 32 // 1..8
 }
 #[inline]
-fn repro_threshold(g: &Genome) -> i32 {
+pub fn repro_threshold(g: &Genome) -> i32 {
     40 + g[REPRO] as i32 // 40..295
 }
 #[inline]
-fn harvest_cap(g: &Genome) -> u16 {
+pub fn harvest_cap(g: &Genome) -> u16 {
     1 + (g[AFF] as u16) / 32 // 1..8
 }
 
@@ -149,6 +161,7 @@ impl Default for Config {
     }
 }
 
+#[cfg(feature = "std")]
 pub struct World {
     pub cfg: Config,
     pub cells: Vec<Option<Agent>>,
@@ -160,6 +173,7 @@ pub struct World {
     pub deaths: u64,
 }
 
+#[cfg(feature = "std")]
 impl World {
     pub fn new(cfg: Config, seed: u64) -> Self {
         let n = cfg.width * cfg.height;
@@ -383,6 +397,7 @@ impl World {
     }
 }
 
+#[cfg(feature = "std")]
 #[inline]
 fn tor_delta(a: usize, b: usize, span: usize) -> i32 {
     let d = (a as i32 - b as i32).abs();
@@ -393,6 +408,7 @@ fn tor_delta(a: usize, b: usize, span: usize) -> i32 {
 // Metrics — the instruments that tell us whether evolution is real
 // ---------------------------------------------------------------------------
 
+#[cfg(feature = "std")]
 pub struct Metrics {
     pub epoch: u64,
     pub population: usize,
@@ -407,6 +423,7 @@ pub struct Metrics {
     pub deaths: u64,
 }
 
+#[cfg(feature = "std")]
 impl Metrics {
     pub fn compute(w: &World) -> Metrics {
         let mut pop = 0usize;

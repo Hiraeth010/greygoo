@@ -3,6 +3,12 @@ name = "sim-core"
 version = "0.1.0"
 edition = "2021"
 
-# Deliberately dependency-free and integer-only so this crate can be dropped
-# into a Solana/Anchor program later with minimal changes (no_std-friendly logic).
+# Integer-only and dependency-light so this crate drops into a Solana program
+# (BPF). The off-chain `World`/`Metrics` live behind the default `std` feature;
+# `Rng`, the genome primitives, and the `sector` module are `no_std`.
+[features]
+default = ["std"]
+std = []
+
 [dependencies]
+bytemuck = { version = "1", default-features = false, features = ["derive"] }
