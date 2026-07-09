@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grey Goo — live evolution</title>
+<style>
+  :root {
+    --bg: #080b0f;
+    --panel: #0f151c;
+    --line: #1c2632;
+    --ink: #e7eef5;
+    --dim: #8296a8;
+    --accent: #4fd6a3;
+    --r: #ff6b6b;
+    --g: #5ee08a;
+    --b: #6aa8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 800px at 70% -10%, #10202a 0%, var(--bg) 55%);
+    color: var(--ink);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; min-height: 100%;
+  }
+  header { padding: 22px 26px 8px; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .3px; font-weight: 650; }
+  h1 small { color: var(--dim); font-weight: 450; font-size: 13px; margin-left: 8px; }
+  .wrap {
+    flex: 1; display: grid; grid-template-columns: minmax(0,1fr) 320px;
+    gap: 22px; padding: 14px 26px 26px; align-items: start;
+  }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+
+  .stage {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 14px;
+  }
+  canvas#grid {
+    width: 100%; max-width: 640px; aspect-ratio: 1 / 1; border-radius: 8px;
+    image-rendering: pixelated; background: #05080b;
+    box-shadow: 0 0 0 1px #0c141c, 0 18px 60px -20px #000, 0 0 60px -30px var(--accent);
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; width: 100%; }
+  button {
+    background: #16202b; color: var(--ink); border: 1px solid var(--line);
+    padding: 8px 14px; border-radius: 9px; cursor: pointer; font: inherit; font-weight: 550;
+    transition: border-color .15s, background .15s;
+  }
+  button:hover { border-color: var(--accent); background: #1a2632; }
+  button.primary { background: var(--accent); color: #04120c; border-color: transparent; }
+  .slider { display: flex; align-items: center; gap: 8px; color: var(--dim); }
+  input[type=range] { accent-color: var(--accent); }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .stat-row { display: flex; gap: 12px; }
+  .stat {
+    flex: 1; background: #0b1219; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .6px; }
+  .stat .v { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  .genes { display: flex; flex-direction: column; gap: 9px; }
+  .genes h2 { margin: 0 0 2px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+  .gene { display: grid; grid-template-columns: 48px 1fr 34px; gap: 10px; align-items: center; }
+  .gene .name { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .gene.hot .name { color: var(--ink); font-weight: 600; }
+  .track {
+    position: relative; height: 10px; background: #0b1219; border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .track .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 6px; background: #33506a; transition: width .12s linear; }
+  .gene.hot .fill { background: linear-gradient(90deg, #2f8f6b, var(--accent)); }
+  .track .base { position: absolute; top: -1px; bottom: -1px; left: 50%; width: 1px; background: #46586a; }
+  .gene .val { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--dim); }
+
+  .legend { font-size: 12px; color: var(--dim); line-height: 1.7; border-top: 1px solid var(--line); padding-top: 14px; }
+  .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: baseline; }
+  .note { color: var(--dim); font-size: 12px; padding: 0 26px 22px; }
+  code { background: #0b1219; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Grey Goo <small>live evolution — the real <code>sim-core</code> engine, compiled to WebAssembly</small></h1>
+  </header>
+
+  <div class="wrap">
+    <div class="stage">
+      <canvas id="grid" width="180" height="180"></canvas>
+      <div class="controls">
+        <button id="play" class="primary">⏸ Pause</button>
+        <button id="reseed">↻ Reseed</button>
+        <div class="slider">
+          <span>speed</span>
+          <input id="speed" type="range" min="1" max="16" value="4" />
+          <span id="speedv" style="width:64px">4 ticks/f</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="stat-row">
+        <div class="stat"><div class="k">Epoch</div><div class="v" id="epoch">0</div></div>
+        <div class="stat"><div class="k">Population</div><div class="v" id="pop">0</div></div>
+      </div>
+
+      <div class="genes" id="genes">
+        <h2>Gene means &nbsp;·&nbsp; center line = random start (127)</h2>
+        <!-- rows injected -->
+      </div>
+
+      <div class="legend">
+        <div><span class="sw" style="background:var(--r)"></span>red = affinity &nbsp;
+             <span class="sw" style="background:var(--g)"></span>green = efficiency (low metabolism) &nbsp;
+             <span class="sw" style="background:var(--b)"></span>blue = aggression</div>
+        <div><span class="sw" style="background:#1c6a5e"></span>teal glow = resource (the sugarscape peaks)</div>
+        <div style="margin-top:8px">Watch <b>metab</b> slide left and <b>aff</b>/<b>aggr</b> slide right — that drift away from the center line <i>is</i> natural selection.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Same deterministic code proven in Phase 1 and running in the on-chain sector — this is the actual simulation, not a mock.</div>
+
+<script>
+const GENES = ["metab","repro","move","aggr","mut","aff","split","dorm"];
+const HOT = new Set(["metab","aff","aggr"]);
+const W = 180, H = 180, INIT_AGENTS = 6500;
+
+let wasm, app, imgData, off, offCtx;
+const cv = document.getElementById('grid');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+// Build gene rows
+const genesEl = document.getElementById('genes');
+const rows = {};
+GENES.forEach(name => {
+  const row = document.createElement('div');
+  row.className = 'gene' + (HOT.has(name) ? ' hot' : '');
+  row.innerHTML = `<span class="name">${name}</span>
+    <div class="track"><div class="fill"></div><div class="base"></div></div>
+    <span class="val">–</span>`;
+  genesEl.appendChild(row);
+  rows[name] = { fill: row.querySelector('.fill'), val: row.querySelector('.val') };
+});
+
+let playing = true, speed = 4;
+const $ = id => document.getElementById(id);
+
+function u32(f) { return f >>> 0; }
+
+function newWorld() {
+  if (app) wasm.free_app(app);
+  const seed = Math.floor(Math.random() * 0xffffffff);
+  app = wasm.init(u32(seed), 0, W, H, INIT_AGENTS);
+  // offscreen buffer at native grid resolution
+  off = document.createElement('canvas'); off.width = W; off.height = H;
+  offCtx = off.getContext('2d');
+  imgData = offCtx.createImageData(W, H);
+}
+
+function draw() {
+  const ptr = wasm.render(app);
+  const mem = new Uint8Array(wasm.memory.buffer, ptr, W * H * 4);
+  imgData.data.set(mem);
+  offCtx.putImageData(imgData, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0, cv.width, cv.height);
+
+  $('epoch').textContent = wasm.epoch(app).toLocaleString();
+  $('pop').textContent = wasm.population(app).toLocaleString();
+  GENES.forEach((name, i) => {
+    const m = wasm.gene_mean(app, i);
+    rows[name].fill.style.width = (m / 255 * 100).toFixed(1) + '%';
+    rows[name].val.textContent = m.toFixed(0);
+  });
+}
+
+function frame() {
+  if (playing) wasm.step(app, speed);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+$('play').onclick = () => {
+  playing = !playing;
+  $('play').textContent = playing ? '⏸ Pause' : '▶ Play';
+  $('play').classList.toggle('primary', playing);
+};
+$('reseed').onclick = () => newWorld();
+$('speed').oninput = e => { speed = +e.target.value; $('speedv').textContent = speed + ' ticks/f'; };
+
+fetch('greygoo.wasm')
+  .then(r => r.arrayBuffer())
+  .then(bytes => WebAssembly.instantiate(bytes, {}))
+  .then(res => {
+    wasm = res.instance.exports;
+    newWorld();
+    requestAnimationFrame(frame);
+  })
+  .catch(err => {
+    document.querySelector('.stage').innerHTML =
+      '<p style="color:#ff8080">Failed to load wasm: ' + err + '</p>';
+  });
+</script>
+</body>
+</html>

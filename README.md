@@ -68,6 +68,22 @@ cargo run --release --bin sim-run -- 4000 1 2 3
 
 Prints per-epoch instruments and a final verdict, and writes per-seed CSVs to `out/`.
 
+## Watch it evolve (browser)
+
+The real `sim-core` engine is compiled to WebAssembly (`viz/greygoo-wasm`, ~17 KB, no wasm-bindgen) and driven by a canvas UI — so the browser runs the *actual* simulation, not a mock. Live grid (agents coloured by genome, resource peaks glowing teal) plus animated per-gene-mean bars where you can literally watch `metab` slide below the random-start line while `aff`/`aggr` climb above it.
+
+```sh
+node viz/serve.mjs      # → http://localhost:3210
+```
+
+Or just open `viz/standalone.html` — a single self-contained file with the wasm embedded (works offline, no server). Rebuild both after engine changes:
+
+```sh
+cargo build -p greygoo-wasm --target wasm32-unknown-unknown --release
+cp <target>/wasm32-unknown-unknown/release/greygoo_wasm.wasm viz/greygoo.wasm
+node viz/bundle.mjs
+```
+
 ## Genome
 
 Eight evolvable genes parameterise a fixed O(1) behaviour loop (no opcode interpreter, so per-agent work is statically bounded — required for the on-chain `tick`):

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "greygoo-viz",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["viz/serve.mjs"],
+      "port": 3210
+    }
+  ]
+}

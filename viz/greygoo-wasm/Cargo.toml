@@ -1,0 +1,19 @@
+[package]
+name = "greygoo-wasm"
+version = "0.1.0"
+edition = "2021"
+
+# Raw C-ABI wasm wrapper around the real sim-core engine — no wasm-bindgen, so
+# the browser runs the exact same biology proven in Phase 1 (and shipped in the
+# on-chain sector). Built with: cargo build --target wasm32-unknown-unknown --release
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+sim-core = { path = "../../crates/sim-core" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -4,7 +4,7 @@ members = ["crates/sim-core", "crates/sim-run"]
 # The SBF program and the LiteSVM bench resolve their own (heavy) Solana deps
 # and target, so they are kept out of the host workspace to avoid feature
 # unification clashes. Build them via their own manifests.
-exclude = ["programs/greygoo", "bench/cu-bench"]
+exclude = ["programs/greygoo", "bench/cu-bench", "viz/greygoo-wasm"]
 
 [profile.release]
 opt-level = 3
