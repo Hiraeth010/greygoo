@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Grey Goo — evolution that lives on-chain</title>
-<meta name="description" content="A closed evolutionary world running entirely on Solana. Self-replicating agents harvest a scarce on-chain resource, mutate, compete, and evolve — no oracles, no servers, just rules and time. Watch it live." />
-<meta property="og:title" content="Grey Goo — evolution that lives on-chain" />
-<meta property="og:description" content="Self-replicating machines evolving entirely on Solana. No oracles. Watch selection happen live." />
+<title>Grey Goo — a living culture on-chain</title>
+<meta name="description" content="A closed evolutionary world running entirely on Solana. Self-replicating agents harvest a scarce on-chain resource, mutate, compete, and evolve — no oracles, no servers. Watch it live, and watch every on-chain move as it happens." />
+<meta property="og:title" content="Grey Goo — a living culture on-chain" />
+<meta property="og:description" content="Self-replicating machines evolving entirely on Solana. Watch the culture live, and every real transaction as it lands." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%2384e0b8'/%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%238a7bff' stroke-width='2'/%3E%3C/svg%3E" />
 </head>
@@ -18,9 +18,9 @@
 <nav class="nav">
   <a class="brand" href="#top"><span class="nucleus"></span> GREY&nbsp;GOO</a>
   <div class="nav-links">
-    <a class="nav-hide" href="#premise">Premise</a>
+    <a class="nav-hide" href="#watch">Watch</a>
+    <a class="nav-hide" href="#onchain">On-chain</a>
     <a class="nav-hide" href="#proof">Proof</a>
-    <a class="nav-hide" href="#instrument">Instrument</a>
     <a class="nav-repo" href="https://github.com/Hiraeth010/greygoo" target="_blank" rel="noopener">GitHub ↗</a>
   </div>
 </nav>
@@ -29,59 +29,103 @@
   <div class="wrap">
     <div class="hero-head">
       <span class="eyebrow">Fully on-chain · Solana · no oracles</span>
-      <h1>Evolution that lives<br />on&#8209;chain.<span class="goo"></span></h1>
+      <h1>A living culture,<br />running on a&nbsp;blockchain.</h1>
       <p class="hero-lede">
-        A closed world of self&#8209;replicating machines. They harvest a scarce
-        on&#8209;chain resource, mutate, compete, and <b>evolve</b> — advanced by a
-        permissionless tick, with nothing to trust but the rules. The field below
-        is the <b>real engine</b>, compiled to WebAssembly. It is not a recording.
+        Thousands of self&#8209;replicating machines harvest a scarce on&#8209;chain resource, mutate,
+        hunt, and <b>evolve</b> — with nothing to trust but the rules. The field below is the
+        <b>real engine</b>, compiled to WebAssembly. Scroll down and it's the same code, live on Solana devnet,
+        where every move is a transaction you can watch land.
       </p>
     </div>
 
-    <div class="specimen" id="specimen">
-      <div class="specimen-bar">
-        <span class="spec-id"><span class="live-dot"></span> SPECIMEN&nbsp;01 · LIVE CULTURE</span>
-        <span class="spec-readout mono">
-          <span>EPOCH&nbsp;<b id="r-epoch">0</b></span>
-          <span>POP&nbsp;<b id="r-pop">0</b></span>
-          <span>STRAINS&nbsp;<b id="r-strain">0</b></span>
-        </span>
-      </div>
-
-      <div class="stage">
-        <span class="tick tl"></span><span class="tick tr"></span>
-        <span class="tick bl"></span><span class="tick br"></span>
-        <canvas id="grid" width="180" height="180"></canvas>
-      </div>
-
-      <div class="controls">
-        <button id="play" class="btn primary">❚❚ Pause</button>
-        <button id="reseed" class="btn">↻ Reseed culture</button>
-        <div class="ctl-speed">
-          <span>RATE</span>
-          <input id="speed" type="range" min="1" max="16" value="4" />
-          <span id="speedv" style="width:66px">4 ticks/f</span>
+    <div class="hero-main">
+      <div class="specimen" id="specimen">
+        <div class="specimen-bar">
+          <span class="spec-id"><span class="live-dot"></span> CULTURE&nbsp;01 · LIVE</span>
+          <div class="modes" role="group" aria-label="colour mode">
+            <button class="mode-btn is-on" data-mode="0">Genome</button>
+            <button class="mode-btn" data-mode="1">Lineage</button>
+            <button class="mode-btn" data-mode="2">Vitality</button>
+          </div>
+        </div>
+        <div class="stage">
+          <span class="tick tl"></span><span class="tick tr"></span>
+          <span class="tick bl"></span><span class="tick br"></span>
+          <canvas id="grid" width="220" height="220"></canvas>
+          <div class="scanline" aria-hidden="true"></div>
+        </div>
+        <div class="controls">
+          <button id="play" class="btn primary">❚❚ Pause</button>
+          <button id="reseed" class="btn">↻ Reseed</button>
+          <div class="ctl-speed">
+            <span>RATE</span>
+            <input id="speed" type="range" min="1" max="16" value="5" />
+            <span id="speedv" style="width:60px">5×</span>
+          </div>
         </div>
       </div>
 
-      <div class="genes">
+      <aside class="vitals">
+        <div class="vital-hero">
+          <div class="v-label">Living agents</div>
+          <div class="v-big mono" id="v-pop">0</div>
+          <canvas id="spark" class="spark" width="300" height="52"></canvas>
+        </div>
+        <div class="vital-grid">
+          <div class="vital"><span class="v-k">Divisions/s</span><span class="v-v mono up" id="v-div">0</span></div>
+          <div class="vital"><span class="v-k">Deaths/s</span><span class="v-v mono" id="v-death">0</span></div>
+          <div class="vital"><span class="v-k">Generations</span><span class="v-v mono" id="v-gen">0</span></div>
+          <div class="vital"><span class="v-k">Lineages left</span><span class="v-v mono" id="v-strain">0</span></div>
+          <div class="vital"><span class="v-k">Epoch</span><span class="v-v mono" id="v-epoch">0</span></div>
+          <div class="vital"><span class="v-k">Metabolism</span><span class="v-v mono" id="v-metab">—</span></div>
+        </div>
+        <p class="vital-note">
+          Watch <b id="v-watch">metabolism</b> fall from the random start of 127 toward the floor —
+          that drift <em>is</em> natural selection, with no goal but survival.
+        </p>
+      </aside>
+    </div>
+  </div>
+</header>
+
+<section id="watch" class="watch rel sec-line">
+  <div class="wrap">
+    <div class="watch-head reveal">
+      <h2>What you're actually watching</h2>
+      <p>Every pixel is one agent. Its colour is its DNA, so as the population adapts, the whole field
+        changes colour in front of you. There's no scripted behaviour — only eight genes, a scarce
+        resource, and selection.</p>
+    </div>
+    <div class="watch-grid">
+      <div class="legend-card reveal">
+        <h3>Colour = genome</h3>
+        <ul class="legend">
+          <li><span class="chip" style="background:var(--r)"></span><b>Red</b> — affinity, how efficiently it harvests</li>
+          <li><span class="chip" style="background:var(--g)"></span><b>Green</b> — efficiency, i.e. low metabolism</li>
+          <li><span class="chip" style="background:var(--b)"></span><b>Blue</b> — aggression, the drive to hunt neighbours</li>
+          <li><span class="chip" style="background:#1c6a5e"></span><b>Teal glow</b> — the resource itself, waiting to be eaten</li>
+        </ul>
+        <p class="legend-tip">Switch the culture to <b>Lineage</b> to watch thousands of founding
+          strains collapse to a handful of winners, or <b>Vitality</b> to see who's fed.</p>
+      </div>
+      <div class="genes reveal">
         <div class="genes-head">
-          <h3>Population genome — mean of each gene</h3>
-          <span class="hint">center line = random start · watch it drift</span>
+          <h3>Population genome · live</h3>
+          <span class="hint">center line = random start (127)</span>
         </div>
         <div id="gene-rows"></div>
       </div>
     </div>
   </div>
-</header>
+</section>
 
 <section id="onchain" class="onchain rel sec-line">
   <div class="wrap">
     <div class="oc-head reveal">
       <h2>Not a simulation <em>of</em> on-chain. It <em>is</em> on-chain.</h2>
-      <p>The same engine, deployed to Solana devnet. This sector lives in a real account and the field
-        below is fetched straight from the chain. Connect a devnet wallet and advance it, seed a strain,
-        or feed it resource — <b>every click is a real transaction</b>.</p>
+      <p>The same engine is deployed to Solana devnet. This sector lives in a real account, the field
+        is fetched straight from the chain, and the feed on the right is the program's <b>real transaction
+        history</b> — every advance, seed, and injection anyone makes. Connect a devnet wallet and add to it.</p>
       <div class="oc-links mono">
         <a id="lnk-program" target="_blank" rel="noopener">program ↗</a>
         <a id="lnk-sector" target="_blank" rel="noopener">sector ↗</a>
@@ -91,150 +135,53 @@
     </div>
 
     <div class="oc-grid">
-      <div class="specimen oc-specimen reveal">
-        <div class="specimen-bar">
-          <span class="spec-id"><span class="live-dot"></span> DEVNET SECTOR · 16×16 · ON-CHAIN</span>
-          <span class="spec-readout mono"><span>EPOCH&nbsp;<b id="oc-epoch">–</b></span><span>POP&nbsp;<b id="oc-pop">–</b></span></span>
+      <div class="oc-left reveal">
+        <div class="specimen oc-specimen">
+          <div class="specimen-bar">
+            <span class="spec-id"><span class="live-dot"></span> DEVNET SECTOR · 16×16</span>
+            <span class="spec-readout mono"><span>EPOCH&nbsp;<b id="oc-epoch">–</b></span><span>POP&nbsp;<b id="oc-pop">–</b></span></span>
+          </div>
+          <div class="stage oc-stage">
+            <span class="tick tl"></span><span class="tick tr"></span>
+            <span class="tick bl"></span><span class="tick br"></span>
+            <canvas id="oc-grid" width="320" height="320"></canvas>
+          </div>
+          <div class="oc-econ">
+            <span class="metric"><span class="k">treasury</span> <b id="oc-treasury" class="mono">–</b></span>
+            <span class="metric"><span class="k">burned</span> <b id="oc-burned" class="mono">–</b></span>
+            <span class="metric good"><span class="k">keeper</span> <b id="oc-keeper" class="mono">–</b></span>
+          </div>
         </div>
-        <div class="stage oc-stage">
-          <span class="tick tl"></span><span class="tick tr"></span>
-          <span class="tick bl"></span><span class="tick br"></span>
-          <canvas id="oc-grid" width="320" height="320"></canvas>
-        </div>
-        <div class="oc-econ">
-          <span class="metric"><span class="k">treasury</span> <b id="oc-treasury" class="mono">–</b></span>
-          <span class="metric"><span class="k">burned</span> <b id="oc-burned" class="mono">–</b></span>
-          <span class="metric good"><span class="k">keeper</span> <b id="oc-keeper" class="mono">–</b></span>
+
+        <div class="oc-panel">
+          <div class="oc-wallet">
+            <button id="oc-connect" class="btn primary">Connect devnet wallet</button>
+            <span id="oc-addr" class="mono"></span>
+          </div>
+          <div class="oc-actions">
+            <button id="oc-tick" class="btn" disabled>▸&nbsp; Advance the world <span class="k mono">tick</span></button>
+            <button id="oc-seed" class="btn" disabled>✦&nbsp; Seed a strain <span class="k mono">seed</span></button>
+            <button id="oc-inject" class="btn" disabled>◈&nbsp; Inject resource <span class="k mono">inject</span></button>
+          </div>
+          <p class="oc-note">Needs <b>Phantom</b> on <b>devnet</b>, funded from a faucet. Your wallet signs;
+            the transaction is sent to devnet.</p>
         </div>
       </div>
 
-      <div class="oc-panel reveal">
-        <div class="oc-wallet">
-          <button id="oc-connect" class="btn primary">Connect devnet wallet</button>
-          <span id="oc-addr" class="mono"></span>
+      <div class="feed reveal">
+        <div class="feed-head">
+          <h3><span class="live-dot"></span> Live on-chain activity</h3>
+          <span class="feed-sub mono" id="feed-count">—</span>
         </div>
-        <div class="oc-actions">
-          <button id="oc-tick" class="btn" disabled>▸&nbsp; Advance the world &nbsp;<span class="k mono">tick</span></button>
-          <button id="oc-seed" class="btn" disabled>✦&nbsp; Seed a strain &nbsp;<span class="k mono">seed</span></button>
-          <button id="oc-inject" class="btn" disabled>◈&nbsp; Inject resource &nbsp;<span class="k mono">inject</span></button>
-        </div>
-        <p class="oc-note">Needs <b>Phantom</b> set to <b>devnet</b>, funded from a faucet. Transactions are signed
-          by your wallet and sent to devnet; the sector is shared, so you may see others' agents too.</p>
-        <div id="oc-log" class="tx-log mono" aria-live="polite"></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section id="premise" class="premise rel">
-  <div class="wrap">
-    <h2>Give simple rules a scarce resource and enough time, and <em>selection does the rest.</em></h2>
-    <div class="cols">
-      <p>Each agent carries an eight&#8209;gene genome that tunes how it feeds, when it
-        breeds, how it moves, and whether it hunts. Reproduction copies the genome
-        with small mutations. <b>Nothing is designed</b> — the traits that survive
-        are the ones the world rewards.</p>
-      <p>The resource is finite and contested. Metabolism burns it, the grid caps the
-        population, and a permissionless <b>tick</b> advances the world for anyone who
-        pays the compute. Determinism is total: every validator computes the same
-        future from the same past.</p>
-      <p>It descends from <b>Avida</b> and <b>Tierra</b> — decades of evidence that
-        closed digital worlds evolve for real — and from <b>Dark Forest</b> and
-        <b>MUD</b>, which proved a game's whole state can live on a chain. Grey Goo is
-        the intersection: the biology of one, the trust model of the other.</p>
-    </div>
-  </div>
-</section>
-
-<section id="proof" class="proof rel sec-line">
-  <div class="wrap">
-    <div class="proof-head">
-      <h2>Every claim is measured, not asserted.</h2>
-      <p>Five phases, each answering one question that could have killed the project.
-        None did. The numbers below come from the real engine and real SBF bytecode.</p>
-    </div>
-
-    <div class="phase">
-      <div class="phase-num">01<span class="done">PROVEN</span></div>
-      <div class="phase-body">
-        <h3>Evolution actually emerges</h3>
-        <p class="claim">From random genomes across three independent seeds, the population
-          converges on the same adaptive strategy — reproducibly. Metabolism is driven to the
-          floor, harvest efficiency and aggression climb, diversity survives, and 3,000 founding
-          lineages sort down to a handful.</p>
-        <div class="metrics">
-          <span class="metric good"><span class="k">metab</span> <span class="v">127 → ~15</span></span>
-          <span class="metric"><span class="k">population</span> self-regulating</span>
-          <span class="metric"><span class="k">reruns</span> bit-identical</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="phase">
-      <div class="phase-num">02<span class="done">PROVEN</span></div>
-      <div class="phase-body">
-        <h3>The compute budget closes</h3>
-        <p class="claim">The tick runs as real SBF bytecode over a 256-cell sector held zero-copy
-          in one account, measured in LiteSVM against Solana's 1.4M-CU ceiling. Work is statically
-          bounded — one pass, no allocation — at roughly 300 CU per agent.</p>
-        <div class="metrics">
-          <span class="metric"><span class="k">full sector</span> ~90K CU</span>
-          <span class="metric good"><span class="k">per tx</span> <span class="v">15 sectors</span></span>
-          <span class="metric"><span class="k">whole world</span> in one block</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="phase">
-      <div class="phase-num">03<span class="done">PROVEN</span></div>
-      <div class="phase-body">
-        <h3>Randomness a validator can't grind</h3>
-        <p class="claim">Native entropy is grindable; VRF is asynchronous. So mutation entropy is
-          keyed per-agent — a leader grinding the shared beacon moves ~4 of 64 agents instead of
-          all 64. We measured it adversarially. Anything valuable is gated on an epoch-ahead VRF beacon.</p>
-        <div class="metrics">
-          <span class="metric"><span class="k">naive grind</span> 64 / 64</span>
-          <span class="metric good"><span class="k">keyed</span> <span class="v">~4 / 64</span></span>
-          <span class="metric"><span class="k">payouts</span> VRF-gated</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="phase">
-      <div class="phase-num">04<span class="done">PROVEN</span></div>
-      <div class="phase-body">
-        <h3>A token economy that stays scarce</h3>
-        <p class="claim">Matter is conserved: a treasury faucet feeds cells, metabolism returns it
-          split 85 / 10 / 5 into recycle, burn, and keeper pay. A constant faucet is a knife-edge —
-          starvation one side, ghost town the other — so an adaptive faucet self-stabilizes the world
-          across a 5× range of treasury sizes, scarcity intact.</p>
-        <div class="metrics">
-          <span class="metric"><span class="k">matter</span> conserved</span>
-          <span class="metric good"><span class="k">faucet</span> <span class="v">self-stabilizing</span></span>
-          <span class="metric"><span class="k">keepers</span> paid per tick</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="phase">
-      <div class="phase-num">05<span class="done">LIVE</span></div>
-      <div class="phase-body">
-        <h3>On-chain, with players in the loop</h3>
-        <p class="claim">The program dispatches three instructions — advance the world, seed a
-          designed strain, or inject resource into a sector — all touching the same sector and
-          treasury accounts, with the economy applied in-program and every flow conserved. Verified
-          on-chain in LiteSVM.</p>
-        <div class="metrics">
-          <span class="metric"><span class="k">tick</span> + economy</span>
-          <span class="metric good"><span class="k">seed</span> <span class="v">strain</span></span>
-          <span class="metric good"><span class="k">inject</span> <span class="v">resource</span></span>
+        <div id="feed-list" class="feed-list mono">
+          <div class="feed-empty">watching the program for transactions…</div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<section id="instrument" class="rel sec-line">
+<section id="how" class="rel sec-line">
   <div class="wrap how">
     <div class="reveal">
       <h2>How the world is built</h2>
@@ -242,12 +189,12 @@
         bytes of one Solana account and advanced independently. Sharding sidesteps the per-account
         write-lock limit, so disjoint sectors tick in parallel across a block.</p>
       <p>The same deterministic, integer-only Rust core runs in three places without divergence: the
-        off-chain proof harness, the on-chain SBF program, and the WebAssembly field you're watching.
-        One engine, three surfaces.</p>
+        off-chain proof harness, the on-chain SBF program, and the WebAssembly field above. One engine,
+        three surfaces — which is why what you watch here is exactly what runs on the chain.</p>
       <ul class="facts">
-        <li><span class="lbl">GENOME</span> <span>eight genes — <b>metab, repro, move, aggr, mut, aff, split, dorm</b> — tuning a fixed O(1) behaviour loop</span></li>
-        <li><span class="lbl">COLOR</span> <span>each agent is painted by its genes: <b>red</b> affinity, <b>green</b> efficiency, <b>blue</b> aggression; teal glow is resource</span></li>
-        <li><span class="lbl">TICK</span> <span>permissionless, staleness-weighted keeper reward keeps every sector alive</span></li>
+        <li><span class="lbl">A TICK</span> <span>regrows the resource, then each agent harvests, pays its metabolism, and — if fed — <b>divides with mutation</b> into an empty neighbour</span></li>
+        <li><span class="lbl">SEED</span> <span>drops a designed genome into an empty cell, paying its energy from the treasury</span></li>
+        <li><span class="lbl">INJECT</span> <span>buys resource into a cell — feed a region and watch a bloom follow</span></li>
       </ul>
     </div>
     <div class="diagram reveal" aria-hidden="true">
@@ -258,7 +205,6 @@
             <stop offset="100%" stop-color="oklch(0.85 0.15 168)" stop-opacity="0"/>
           </radialGradient>
         </defs>
-        <!-- world of sectors -->
         <g transform="translate(8,40)" stroke="var(--line-2)" fill="none">
           <rect x="0" y="0" width="150" height="150" rx="6" stroke="var(--line-2)"/>
           <g stroke="var(--line)">
@@ -268,9 +214,7 @@
           <rect x="50" y="50" width="50" height="50" fill="oklch(0.70 0.15 275 / 0.15)" stroke="var(--uv)"/>
         </g>
         <text x="12" y="28" fill="var(--faint)" font-family="var(--font-mono)" font-size="11">WORLD · sectors</text>
-        <!-- connector -->
         <path d="M162 115 C 200 115, 200 150, 235 150" stroke="var(--uv-dim)" fill="none" stroke-dasharray="3 4"/>
-        <!-- one sector expanded -->
         <text x="238" y="70" fill="var(--faint)" font-family="var(--font-mono)" font-size="11">SECTOR · 16×16 cells</text>
         <g transform="translate(238,80)">
           <rect x="0" y="0" width="112" height="112" rx="6" fill="oklch(0.05 0.01 270)" stroke="var(--uv)"/>
@@ -290,12 +234,98 @@
   </div>
 </section>
 
+<section id="proof" class="proof rel sec-line">
+  <div class="wrap">
+    <div class="proof-head">
+      <h2>Every claim is measured, not asserted.</h2>
+      <p>Five questions that could have killed the project. Each was answered with the real engine and
+        real SBF bytecode — not a pitch deck.</p>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num">01<span class="done">PROVEN</span></div>
+      <div class="phase-body">
+        <h3>Evolution actually emerges</h3>
+        <p class="claim">From random genomes across three independent seeds, the population converges on the
+          same adaptive strategy — reproducibly. Metabolism is driven to the floor, harvest efficiency and
+          aggression climb, diversity survives, and 3,000 founding lineages sort down to a handful.</p>
+        <div class="metrics">
+          <span class="metric good"><span class="k">metab</span> <span class="v">127 → ~15</span></span>
+          <span class="metric"><span class="k">population</span> self-regulating</span>
+          <span class="metric"><span class="k">reruns</span> bit-identical</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num">02<span class="done">PROVEN</span></div>
+      <div class="phase-body">
+        <h3>The compute budget closes</h3>
+        <p class="claim">The tick runs as real SBF bytecode over a 256-cell sector held zero-copy in one
+          account, measured in LiteSVM against Solana's 1.4M-CU ceiling. Work is statically bounded — one
+          pass, no allocation — at roughly 300 CU per agent.</p>
+        <div class="metrics">
+          <span class="metric"><span class="k">full sector</span> ~90K CU</span>
+          <span class="metric good"><span class="k">per tx</span> <span class="v">15 sectors</span></span>
+          <span class="metric"><span class="k">whole world</span> in one block</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num">03<span class="done">PROVEN</span></div>
+      <div class="phase-body">
+        <h3>Randomness a validator can't grind</h3>
+        <p class="claim">Native entropy is grindable; VRF is asynchronous. So mutation entropy is keyed
+          per-agent — a leader grinding the shared beacon moves ~4 of 64 agents instead of all 64. We
+          measured it adversarially. Anything valuable is gated on an epoch-ahead VRF beacon.</p>
+        <div class="metrics">
+          <span class="metric"><span class="k">naive grind</span> 64 / 64</span>
+          <span class="metric good"><span class="k">keyed</span> <span class="v">~4 / 64</span></span>
+          <span class="metric"><span class="k">payouts</span> VRF-gated</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num">04<span class="done">PROVEN</span></div>
+      <div class="phase-body">
+        <h3>A token economy that stays scarce</h3>
+        <p class="claim">Matter is conserved: a treasury faucet feeds cells, metabolism returns it split
+          85 / 10 / 5 into recycle, burn, and keeper pay. A constant faucet is a knife-edge — starvation one
+          side, ghost town the other — so an adaptive faucet self-stabilizes across a 5× range of treasury
+          sizes, scarcity intact.</p>
+        <div class="metrics">
+          <span class="metric"><span class="k">matter</span> conserved</span>
+          <span class="metric good"><span class="k">faucet</span> <span class="v">self-stabilizing</span></span>
+          <span class="metric"><span class="k">keepers</span> paid per tick</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-num">05<span class="done">LIVE</span></div>
+      <div class="phase-body">
+        <h3>On-chain, with players in the loop</h3>
+        <p class="claim">The program is deployed to devnet with three player instructions — advance the world,
+          seed a designed strain, or inject resource — plus a $GOO token with a fixed, locked supply. Every
+          action above is a real transaction against it.</p>
+        <div class="metrics">
+          <span class="metric good"><span class="k">devnet</span> <span class="v">live</span></span>
+          <span class="metric"><span class="k">$GOO</span> supply locked</span>
+          <span class="metric"><span class="k">actions</span> real txs</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <footer class="foot rel">
   <div class="wrap foot-grid">
     <div>
       <h3><span class="nucleus" style="display:inline-block;vertical-align:middle;margin-right:8px"></span>Grey&nbsp;Goo</h3>
-      <p>An open experiment in fully on-chain artificial life. Built and proven in the
-        open — evolution, compute, entropy, and economy, each measured.</p>
+      <p>An open experiment in fully on-chain artificial life. Built and proven in the open —
+        evolution, compute, entropy, and economy, each measured.</p>
       <div class="foot-meta">RUST · SOLANA SBF · WEBASSEMBLY · NO ORACLES · NO SERVERS</div>
     </div>
     <div class="foot-links">

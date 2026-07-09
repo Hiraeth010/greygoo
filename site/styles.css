@@ -276,7 +276,105 @@ section { position: relative; z-index: 1; padding: clamp(56px, 9vw, 128px) 0; }
 .js .reveal { opacity: 0; transform: translateY(16px); }
 .js .reveal.in { opacity: 1; transform: none; }
 
+/* ===================== redesign: bolder hero + vitals + feed ===================== */
+
+.hero h1 { font-weight: 800; font-size: clamp(2.7rem, 8.5vw, 5.6rem); }
+
+.hero-main {
+  margin-top: clamp(30px, 5vw, 52px);
+  display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: clamp(18px, 2.5vw, 28px); align-items: start;
+}
+@media (max-width: 900px) { .hero-main { grid-template-columns: 1fr; } }
+.hero-main .specimen { margin-top: 0; }
+
+/* view-mode toggle */
+.modes { display: flex; gap: 2px; background: oklch(0.16 0.012 270); border: 1px solid var(--line); border-radius: 9px; padding: 2px; }
+.mode-btn {
+  font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.02em;
+  color: var(--muted); background: transparent; border: 0; border-radius: 7px;
+  padding: 5px 10px; cursor: pointer; transition: color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.mode-btn:hover { color: var(--ink); }
+.mode-btn.is-on { color: oklch(0.14 0.03 275); background: var(--uv); font-weight: 600; }
+
+/* animated scan line over the specimen (instrument feel) */
+.scanline {
+  position: absolute; left: 0; right: 0; top: 0; height: 20%;
+  background: linear-gradient(180deg, transparent, oklch(0.80 0.16 278 / 0.10), transparent);
+  animation: scan 5.5s linear infinite; pointer-events: none; mix-blend-mode: screen;
+}
+@keyframes scan { 0% { transform: translateY(-20%); } 100% { transform: translateY(500%); } }
+.stage canvas { filter: saturate(1.12) contrast(1.05); }
+
+/* vitals rail */
+.vitals {
+  border: 1px solid var(--line-2); border-radius: 16px; background: var(--bg-2);
+  padding: 20px; display: flex; flex-direction: column; gap: 18px;
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.03);
+}
+.vital-hero { display: flex; flex-direction: column; gap: 2px; }
+.v-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.v-big { font-size: clamp(2.6rem, 6vw, 3.6rem); font-weight: 600; line-height: 1; color: var(--mint); letter-spacing: -0.02em; }
+.spark { width: 100%; height: 52px; margin-top: 8px; display: block; }
+.vital-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.vital { background: var(--bg-2); padding: 12px 13px; display: flex; flex-direction: column; gap: 3px; }
+.v-k { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.v-v { font-size: 1.25rem; font-weight: 500; color: var(--ink); }
+.v-v.up { color: var(--mint); }
+.v-v.down { color: oklch(0.72 0.15 25); }
+.vital-note { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+.vital-note b { color: var(--ink); }
+.vital-note em { font-style: normal; color: var(--uv); }
+
+/* what you're watching */
+.watch-head { max-width: 62ch; }
+.watch h2 { font-size: clamp(1.8rem, 4.2vw, 2.9rem); }
+.watch-head p { color: var(--muted); margin: 18px 0 0; font-size: 1.08rem; max-width: 60ch; }
+.watch-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: clamp(18px, 3vw, 32px); margin-top: 40px; align-items: start; }
+@media (max-width: 780px) { .watch-grid { grid-template-columns: 1fr; } }
+.legend-card { border: 1px solid var(--line-2); border-radius: 16px; background: var(--bg-2); padding: 22px; }
+.legend-card h3 { font-size: 1.15rem; margin-bottom: 16px; }
+.legend { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.legend li { display: grid; grid-template-columns: auto 1fr; gap: 11px; align-items: baseline; color: var(--muted); font-size: 14px; }
+.legend b { color: var(--ink); font-weight: 600; }
+.chip { width: 12px; height: 12px; border-radius: 3px; align-self: center; box-shadow: 0 0 10px currentColor; }
+.legend-tip { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
+.legend-tip b { color: var(--muted); }
+.watch-grid .genes { margin: 0; }
+
+/* on-chain layout: sector+controls on the left, live feed on the right */
+.oc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(18px, 3vw, 28px); margin-top: 40px; align-items: start; }
+@media (max-width: 900px) { .oc-grid { grid-template-columns: 1fr; } }
+.oc-left { display: flex; flex-direction: column; gap: 16px; }
+.oc-specimen { margin-top: 0; }
+
+/* live transaction feed */
+.feed { border: 1px solid var(--line-2); border-radius: 16px; background: var(--bg-2); padding: 18px; display: flex; flex-direction: column; min-height: 420px; }
+.feed-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.feed-head h3 { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; display: flex; align-items: center; gap: 9px; }
+.feed-sub { font-size: 11px; color: var(--faint); }
+.feed-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; max-height: 520px; }
+.feed-empty { color: var(--faint); font-size: 13px; padding: 20px 4px; }
+.feed-row {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: center;
+  padding: 11px 8px; border-bottom: 1px solid oklch(0.18 0.01 270);
+  animation: feedin 0.5s var(--ease);
+}
+@keyframes feedin { from { opacity: 0; transform: translateY(-8px); background: oklch(0.70 0.15 275 / 0.10); } to { opacity: 1; transform: none; } }
+.feed-dot { width: 9px; height: 9px; border-radius: 2px; box-shadow: 0 0 8px currentColor; }
+.fd-tick { color: var(--uv); } .fd-seed { color: var(--mint); } .fd-inject { color: oklch(0.80 0.14 90); }
+.fd-init { color: var(--faint); } .fd-err { color: oklch(0.70 0.15 25); }
+.feed-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.feed-act { font-size: 13px; color: var(--ink); font-weight: 500; }
+.feed-act .who { color: var(--faint); font-weight: 400; }
+.feed-time { font-size: 11px; color: var(--faint); white-space: nowrap; }
+.feed-row a { color: inherit; }
+.feed-row:hover .feed-act { color: var(--mint); }
+
 @media (prefers-reduced-motion: reduce) {
   .phase, .reveal { opacity: 1; transform: none; transition: none; }
-  .live-dot { animation: none; }
+  .live-dot, .scanline { animation: none; }
+  .scanline { display: none; }
+  .feed-row { animation: none; }
 }

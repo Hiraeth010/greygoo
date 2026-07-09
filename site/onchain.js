@@ -1,19 +1,20 @@
 // Grey Goo — devnet bridge. Renders the on-chain sector fetched straight from
-// Solana, and lets a Phantom wallet send real tick / seed / inject transactions.
-// The instruction byte layouts here must match the Rust program exactly.
+// Solana, streams the program's real transaction history as a live feed, and
+// lets a Phantom wallet send real tick / seed / inject transactions.
 import * as web3 from 'https://esm.sh/@solana/web3.js@1.95.3?bundle';
 
 const $ = (id) => document.getElementById(id);
-const SECTOR_CELLS = 256;
-const CELL = 32;
+const SECTOR_CELLS = 256, CELL = 32;
+const OP = { 0: 'advanced the world', 1: 'seeded a strain', 2: 'injected resource', 3: 'initialised world', 4: 'initialised sector' };
+const OPCLASS = { 0: 'fd-tick', 1: 'fd-seed', 2: 'fd-inject', 3: 'fd-init', 4: 'fd-init' };
 
-let cfg, conn, PROGRAM, WORLD, SECTOR, SLOT_HASHES;
-let wallet = null, walletPk = null;
+let cfg, conn, PROGRAM, WORLD, SECTOR, SLOT_HASHES, PROGRAM_B58;
+let wallet = null, walletPk = null, lastSector = null;
+const seen = new Map();
 
-// ---- little-endian encoders → Uint8Array (match the program) ----
+// ---- LE encoders (match the Rust program) ----
 function bytes(parts) {
-  const total = parts.reduce((n, p) => n + p.len, 0);
-  const out = new Uint8Array(total);
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.len, 0));
   const dv = new DataView(out.buffer);
   let o = 0;
   for (const p of parts) {
@@ -27,131 +28,134 @@ function bytes(parts) {
 }
 const meta = (pk, w) => ({ pubkey: pk, isSigner: false, isWritable: w });
 const mkIx = (keys, data) => new web3.TransactionInstruction({ programId: PROGRAM, keys, data });
+const ixTick = () => mkIx([meta(SECTOR, true), meta(WORLD, true), meta(SLOT_HASHES, false)], bytes([{ u8: 0, len: 1 }, { u16: 4, len: 2 }]));
+const ixSeed = (cell, g, energy, strain) => mkIx([meta(SECTOR, true), meta(WORLD, true)], bytes([{ u8: 1, len: 1 }, { u16: cell, len: 2 }, { raw: g, len: 8 }, { u16: energy, len: 2 }, { u32: strain, len: 4 }]));
+const ixInject = (cell, amount) => mkIx([meta(SECTOR, true), meta(WORLD, true)], bytes([{ u8: 2, len: 1 }, { u16: cell, len: 2 }, { u16: amount, len: 2 }]));
 
-const ixTick = () => mkIx(
-  [meta(SECTOR, true), meta(WORLD, true), meta(SLOT_HASHES, false)],
-  bytes([{ u8: 0x00, len: 1 }, { u16: 4, len: 2 }]) // regen 4
-);
-const ixSeed = (cell, genome, energy, strain) => mkIx(
-  [meta(SECTOR, true), meta(WORLD, true)],
-  bytes([{ u8: 0x01, len: 1 }, { u16: cell, len: 2 }, { raw: genome, len: 8 }, { u16: energy, len: 2 }, { u32: strain, len: 4 }])
-);
-const ixInject = (cell, amount) => mkIx(
-  [meta(SECTOR, true), meta(WORLD, true)],
-  bytes([{ u8: 0x02, len: 1 }, { u16: cell, len: 2 }, { u16: amount, len: 2 }])
-);
+// ---- base58 decode (for reading the instruction opcode) ----
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function bs58(str) {
+  const bytes = [0];
+  for (const ch of str) {
+    let carry = B58.indexOf(ch); if (carry < 0) return new Uint8Array();
+    for (let j = 0; j < bytes.length; j++) { carry += bytes[j] * 58; bytes[j] = carry & 0xff; carry >>= 8; }
+    while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
+  }
+  for (let k = 0; k < str.length && str[k] === '1'; k++) bytes.push(0);
+  return new Uint8Array(bytes.reverse());
+}
 
-// ---- read on-chain state ----
+// ---- on-chain state ----
 const aliveAt = (d, i) => d[i * CELL + 24] !== 0;
 function readWorld(d) {
   const dv = new DataView(d.buffer, d.byteOffset, d.byteLength);
-  return {
-    epoch: Number(dv.getBigUint64(8, true)),
-    treasury: Number(dv.getBigUint64(16, true)),
-    burned: Number(dv.getBigUint64(24, true)),
-    keeper: Number(dv.getBigUint64(32, true)),
-  };
+  return { epoch: Number(dv.getBigUint64(8, true)), treasury: Number(dv.getBigUint64(16, true)), burned: Number(dv.getBigUint64(24, true)), keeper: Number(dv.getBigUint64(32, true)) };
 }
 const fmt = (n) => n.toLocaleString();
-
 function renderSector(d) {
-  const W = 16, H = 16;
-  const off = document.createElement('canvas'); off.width = W; off.height = H;
-  const octx = off.getContext('2d');
-  const img = octx.createImageData(W, H);
+  const off = document.createElement('canvas'); off.width = 16; off.height = 16;
+  const octx = off.getContext('2d'); const img = octx.createImageData(16, 16);
   let pop = 0;
   for (let i = 0; i < SECTOR_CELLS; i++) {
     const b = i * CELL, o = i * 4;
-    if (aliveAt(d, i)) {
-      pop++;
-      const metab = d[b + 16], aggr = d[b + 16 + 3], aff = d[b + 16 + 5];
-      img.data[o] = aff; img.data[o + 1] = 255 - metab; img.data[o + 2] = aggr; img.data[o + 3] = 255;
-    } else {
-      const res = d[b] | (d[b + 1] << 8), cap = d[b + 2] | (d[b + 3] << 8);
-      const glow = Math.min(150, 18 + (cap ? (res * 150) / cap : 0));
-      img.data[o] = 3; img.data[o + 1] = glow / 2 + 6; img.data[o + 2] = glow; img.data[o + 3] = 255;
-    }
+    if (aliveAt(d, i)) { pop++; const mt = d[b + 16], ag = d[b + 19], af = d[b + 21]; img.data[o] = af; img.data[o + 1] = 255 - mt; img.data[o + 2] = ag; img.data[o + 3] = 255; }
+    else { const res = d[b] | (d[b + 1] << 8), cap = d[b + 2] | (d[b + 3] << 8); const gl = Math.min(150, 18 + (cap ? (res * 150) / cap : 0)); img.data[o] = 3; img.data[o + 1] = gl / 2 + 6; img.data[o + 2] = gl; img.data[o + 3] = 255; }
   }
   octx.putImageData(img, 0, 0);
   const cv = $('oc-grid'), ctx = cv.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.drawImage(off, 0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = false; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(off, 0, 0, cv.width, cv.height);
   return pop;
 }
+function randomEmptyCell(d) { const e = []; for (let i = 0; i < SECTOR_CELLS; i++) if (!aliveAt(d, i)) e.push(i); return e.length ? e[(Math.random() * e.length) | 0] : 0; }
 
-function randomEmptyCell(d) {
-  const empties = [];
-  for (let i = 0; i < SECTOR_CELLS; i++) if (!aliveAt(d, i)) empties.push(i);
-  return empties.length ? empties[(Math.random() * empties.length) | 0] : 0;
-}
-
-let lastSector = null;
 async function refresh() {
   try {
-    const [sAcc, wAcc] = await Promise.all([conn.getAccountInfo(SECTOR), conn.getAccountInfo(WORLD)]);
-    if (sAcc) { lastSector = new Uint8Array(sAcc.data); $('oc-pop').textContent = renderSector(lastSector); }
-    if (wAcc) {
-      const w = readWorld(new Uint8Array(wAcc.data));
-      $('oc-epoch').textContent = fmt(w.epoch);
-      $('oc-treasury').textContent = fmt(w.treasury);
-      $('oc-burned').textContent = fmt(w.burned);
-      $('oc-keeper').textContent = fmt(w.keeper);
-    }
-  } catch (e) { /* transient RPC hiccup; next tick retries */ }
+    const [s, w] = await Promise.all([conn.getAccountInfo(SECTOR), conn.getAccountInfo(WORLD)]);
+    if (s) { lastSector = new Uint8Array(s.data); $('oc-pop').textContent = renderSector(lastSector); }
+    if (w) { const x = readWorld(new Uint8Array(w.data)); $('oc-epoch').textContent = fmt(x.epoch); $('oc-treasury').textContent = fmt(x.treasury); $('oc-burned').textContent = fmt(x.burned); $('oc-keeper').textContent = fmt(x.keeper); }
+  } catch (e) {}
 }
 
-// ---- tx log ----
-function logRow(label) {
-  const row = document.createElement('div');
-  row.className = 'pending';
-  row.textContent = `↑ ${label} — sending…`;
-  $('oc-log').prepend(row);
-  return {
-    done: (sig) => { row.className = ''; row.innerHTML = `✓ ${label} — <a href="https://explorer.solana.com/tx/${sig}?cluster=devnet" target="_blank" rel="noopener">${sig.slice(0, 8)}…${sig.slice(-6)} ↗</a>`; },
-    fail: (msg) => { row.className = 'err'; row.textContent = `✕ ${label} — ${msg}`; },
-  };
+// ---- live transaction feed ----
+function timeAgo(t) {
+  if (!t) return 'now';
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - t));
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
 }
-
-async function sendIx(ix, label) {
-  const row = logRow(label);
-  try {
-    const { blockhash } = await conn.getLatestBlockhash();
-    const tx = new web3.Transaction().add(ix);
-    tx.feePayer = walletPk;
-    tx.recentBlockhash = blockhash;
-    const signed = await wallet.signTransaction(tx); // wallet signs; we send to devnet
-    const sig = await conn.sendRawTransaction(signed.serialize());
-    await conn.confirmTransaction(sig, 'confirmed');
-    row.done(sig);
-    await refresh();
-  } catch (e) {
-    row.fail((e && e.message ? e.message : String(e)).slice(0, 80));
+function classify(tx) {
+  if (!tx) return { action: 'transaction', op: -1, actor: null };
+  const msg = tx.transaction.message;
+  const actor = msg.accountKeys?.[0]?.pubkey?.toBase58?.() ?? null;
+  let op = -1;
+  for (const ins of msg.instructions || []) {
+    const pid = ins.programId?.toBase58?.() ?? ins.programId;
+    if (pid === PROGRAM_B58) { if (ins.data) { const d = bs58(ins.data); if (d.length) op = d[0]; } break; }
   }
+  return { action: OP[op] || 'transaction', op, actor };
+}
+function rowEl(e) {
+  const row = document.createElement('div'); row.className = 'feed-row';
+  const cls = e.err ? 'fd-err' : (OPCLASS[e.op] || 'fd-init');
+  const who = e.actor ? e.actor.slice(0, 4) + '…' + e.actor.slice(-4) : '';
+  row.innerHTML =
+    `<span class="feed-dot ${cls}"></span>` +
+    `<div class="feed-main"><a class="feed-act" href="https://explorer.solana.com/tx/${e.sig}?cluster=devnet" target="_blank" rel="noopener">${e.err ? e.action + ' · failed' : e.action} <span class="who">${who}</span></a></div>` +
+    `<span class="feed-time">${timeAgo(e.time)}</span>`;
+  return row;
+}
+async function pollFeed() {
+  let sigs;
+  try { sigs = await conn.getSignaturesForAddress(PROGRAM, { limit: 25 }); } catch { return; }
+  const fresh = sigs.filter((s) => !seen.has(s.signature));
+  if (fresh.length) {
+    let parsed = [];
+    try { parsed = await conn.getParsedTransactions(fresh.map((s) => s.signature), { maxSupportedTransactionVersion: 0 }); } catch {}
+    fresh.forEach((s, i) => seen.set(s.signature, { sig: s.signature, err: !!s.err, time: s.blockTime, ...classify(parsed[i]) }));
+    const list = $('feed-list');
+    const empty = list.querySelector('.feed-empty'); if (empty) empty.remove();
+    for (let i = fresh.length - 1; i >= 0; i--) list.prepend(rowEl(seen.get(fresh[i].signature)));
+    while (list.children.length > 40) list.removeChild(list.lastChild);
+  }
+  $('feed-count').textContent = `${seen.size} seen`;
 }
 
-// ---- wallet ----
+// ---- wallet + actions ----
 async function connect() {
   const p = window.solana;
-  if (!p || !p.isPhantom) {
-    window.open('https://phantom.app/', '_blank');
-    return;
-  }
+  if (!p || !p.isPhantom) { window.open('https://phantom.app/', '_blank'); return; }
   try {
-    const r = await p.connect();
-    wallet = p; walletPk = r.publicKey;
+    const r = await p.connect(); wallet = p; walletPk = r.publicKey;
     $('oc-addr').textContent = walletPk.toBase58();
     $('oc-connect').textContent = 'Wallet connected';
     ['oc-tick', 'oc-seed', 'oc-inject'].forEach((id) => ($(id).disabled = false));
-  } catch (e) { /* user rejected */ }
+  } catch (e) {}
+}
+async function sendIx(ix, btn) {
+  const label = btn.querySelector('.k')?.previousSibling?.textContent || '';
+  const prev = btn.innerHTML; btn.disabled = true; btn.textContent = 'signing…';
+  try {
+    const { blockhash } = await conn.getLatestBlockhash();
+    const tx = new web3.Transaction().add(ix); tx.feePayer = walletPk; tx.recentBlockhash = blockhash;
+    const signed = await wallet.signTransaction(tx);
+    btn.textContent = 'confirming…';
+    const sig = await conn.sendRawTransaction(signed.serialize());
+    await conn.confirmTransaction(sig, 'confirmed');
+    await refresh(); await pollFeed();
+  } catch (e) {
+    btn.textContent = (e?.message || 'failed').slice(0, 24);
+    await new Promise((r) => setTimeout(r, 1600));
+  }
+  btn.innerHTML = prev; btn.disabled = false; void label;
 }
 
 async function init() {
   cfg = await (await fetch('devnet.json')).json();
   conn = new web3.Connection(cfg.rpc, 'confirmed');
-  PROGRAM = new web3.PublicKey(cfg.programId);
-  WORLD = new web3.PublicKey(cfg.world);
-  SECTOR = new web3.PublicKey(cfg.sector);
+  PROGRAM = new web3.PublicKey(cfg.programId); PROGRAM_B58 = cfg.programId;
+  WORLD = new web3.PublicKey(cfg.world); SECTOR = new web3.PublicKey(cfg.sector);
   SLOT_HASHES = web3.SYSVAR_SLOT_HASHES_PUBKEY;
 
   const ex = (id, kind) => `https://explorer.solana.com/${kind}/${id}?cluster=devnet`;
@@ -161,22 +165,12 @@ async function init() {
   $('lnk-goo').href = ex(cfg.goo, 'address');
 
   $('oc-connect').onclick = connect;
-  $('oc-tick').onclick = () => sendIx(ixTick(), 'tick');
-  $('oc-seed').onclick = () => {
-    const cell = lastSector ? randomEmptyCell(lastSector) : 0;
-    const g = new Uint8Array(8); crypto.getRandomValues(g);
-    sendIx(ixSeed(cell, g, 120, (Math.random() * 0xffffffff) >>> 0), `seed → cell ${cell}`);
-  };
-  $('oc-inject').onclick = () => {
-    const cell = lastSector ? randomEmptyCell(lastSector) : 0;
-    sendIx(ixInject(cell, 8), `inject → cell ${cell}`);
-  };
+  $('oc-tick').onclick = (e) => sendIx(ixTick(), e.currentTarget);
+  $('oc-seed').onclick = (e) => { const cell = lastSector ? randomEmptyCell(lastSector) : 0; const g = new Uint8Array(8); crypto.getRandomValues(g); sendIx(ixSeed(cell, g, 120, (Math.random() * 0xffffffff) >>> 0), e.currentTarget); };
+  $('oc-inject').onclick = (e) => { const cell = lastSector ? randomEmptyCell(lastSector) : 0; sendIx(ixInject(cell, 8), e.currentTarget); };
 
-  await refresh();
+  await refresh(); await pollFeed();
   setInterval(refresh, 6000);
+  setInterval(pollFeed, 7000);
 }
-
-init().catch((e) => {
-  const log = $('oc-log');
-  if (log) log.innerHTML = `<div class="err">on-chain bridge failed to load: ${e.message}</div>`;
-});
+init().catch((e) => { const l = $('feed-list'); if (l) l.innerHTML = `<div class="feed-empty" style="color:#ff8f8f">bridge failed: ${e.message}</div>`; });
